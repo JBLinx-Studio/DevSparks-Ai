@@ -1,0 +1,83 @@
+# DevSpark AI — Architecture & Refactor Blueprint (Summary)
+
+This document outlines the non-breaking, phased refactor plan, target structure, and practical guardrails to move DevSpark AI from a tangled codebase into a maintainable, modular, multi-language platform.
+
+1) Current inventory (sample)
+- Entry: index.html / app.js (single-page IDE)
+- Features: ChatManager, PreviewManager, GitHubManager, FileManager, BuildManager, CommentsManager, ProjectManager, StorageManager, UI / DevLog panels
+- Worker: buildWorker.js
+- Styles: styles.css
+- Utilities: utils.js, configParser.js, liveReload.js, settingsManager.js
+
+2) Target layout (minimal, incremental - monorepo-friendly)
+- apps/
+  - web/ (existing SPA)
+    - src/
+      - features/
+        - editor/
+        - projects/
+        - chat/
+        - preview/
+      - services/ (AI, GitHub, Puter)
+      - infra/ (storage, upload wrappers, websim-adapter)
+      - ui/ (shared components)
+      - styles/
+- packages/
+  - utils/
+  - types/
+  - build/
+- docs/
+  - ARCHITECTURE.md (this file)
+  - CONTRIBUTING.md
+  - CONVENTIONS.md
+- scripts/ (lint, test, build, smoke tests)
+
+3) Refactor principles (non-breaking)
+- Small, reversible steps: each move is a single-feature migration with tests / smoke checks.
+- One responsibility per module: services do not access DOM directly; UI uses services.
+- Clear naming conventions:
+  - files/dirs: kebab-case
+  - classes/components: PascalCase
+  - functions/vars: camelCase
+- Add defensive guards for DOM operations (avoid .null reads).
+- Centralize feature flags and tweakables via annotated JSDoc for runtime tuning.
+
+4) Phased migration plan (safe, testable)
+Phase 0 — Safety & infra (days 0–1)
+- Add minimal docs, smoke tests for panels (DevLog), and protective guards (already applied).
+- Add dev-only endpoints that allow rendering internal scripts into DevLog.
+
+Phase 1 — Feature boundaries (days 1–3)
+- Extract managers into /features/* with public APIs.
+- Replace direct DOM queries in services with events or App-provided adapters.
+
+Phase 2 — Shared packages (days 3–7)
+- Move utils, constants, types into packages/utils and packages/types.
+- Add lightweight tests (vitest) for utilities and BuildManager behavior.
+
+Phase 3 — Tooling & CI (days 7–10)
+- Add ESLint, Prettier, basic GitHub Actions: lint → type-check → tests.
+- Add pre-commit hooks for format and quick static checks.
+
+Phase 4 — Multi-language orchestration (weeks 2+)
+- Introduce orchestrator service for language detection and toolchain checks.
+- Provide safe warnings when toolchains (tsc, rustc, go, javac, python) are unavailable.
+
+5) Quick wins (already implemented / to keep)
+- DevLog loader (safe fetch + graceful errors).
+- Add tweakable fields and central _internalScriptPaths list for DevLog.
+- Defenses against missing DOM nodes (no runtime crashes).
+
+6) Next actions for implementer
+- Accept this DevLog fix & docs, run smoke test: click DevLog tab and confirm content populates.
+- Start moving managers to feature folders one-by-one (FileManager → features/projects/file-manager.*).
+- Add unit tests for critical flows: DevLog rendering, preview build generation, GitHub connect/disconnect.
+
+---
+
+If you'd like, I can now:
+- produce the condensed 1–2 paragraph "system instruction" you can pin (yes/no),
+- and begin Phase 1 automated moves (one module at a time), providing diffs and smoke tests per step.
+
+Status: ready to continue with the next safe refactor batch when you confirm.
+
