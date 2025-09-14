@@ -231,46 +231,6 @@
 
   // expose a lightweight test method on window to allow external callers to trigger the same flow
   window.__puterInit = { statusEl, setStatus };
-
-  // remove legacy puter-init.js (replaced by TS initializer)
-  // Note: this file is intentionally left present as a compatibility shim that forwards to the new PuterIntegration when loaded.
-  (async function legacyPuterInitForwarder() {
-    // If the modern PuterIntegration is available (Lovable / Vite path), prefer it.
-    try {
-      // wait briefly for the TS module to initialize (Vite dev server will load /src)
-      const maxWait = 3000;
-      const start = Date.now();
-      while (!window.PuterIntegration && Date.now() - start < maxWait) {
-        await new Promise(r => setTimeout(r, 100));
-      }
-      if (window.PuterIntegration && typeof window.PuterIntegration.runDiagnostics === 'function') {
-        // expose small helpers to the global namespace for backwards compatibility
-        window._puterLegacy = {
-          signIn: () => window.PuterIntegration.signIn(),
-          signOut: () => window.PuterIntegration.signOut(),
-          getUser: () => window.PuterIntegration.getUser(),
-          runDiagnostics: () => window.PuterIntegration.runDiagnostics()
-        };
-        // update UI badge if present
-        try { document.getElementById('cloudStorageStatus') && window.PuterIntegration.getUser().then(u => {
-          const statusEl = document.getElementById('cloudStorageStatus');
-          if (statusEl) statusEl.textContent = u ? `Cloud Storage: Connected (Puter.AI — ${u.username || u.id})` : 'Cloud Storage: Local (Puter.AI not connected)';
-        }); } catch (e) {}
-        return;
-      }
-    } catch (e) {
-      // fall through to very small fallback so old code doesn't crash
-    }
-
-    // Fallback minimal shim (non-fatal)
-    window._puterLegacy = {
-      signIn: async () => { throw new Error('PuterIntegration not initialized'); },
-      signOut: async () => { throw new Error('PuterIntegration not initialized'); },
-      getUser: async () => null,
-      runDiagnostics: async () => ({ ok: false, reason: 'PuterIntegration missing' })
-    };
-  })();
-
   // run initial badge check after puter-init completes (best-effort)
   try { window.checkAndSetProjectBadge?.(); } catch(e){/* ignore */}
 })()
