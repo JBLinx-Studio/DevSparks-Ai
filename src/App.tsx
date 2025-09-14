@@ -11,7 +11,7 @@ function App() {
         document.body.innerHTML = '';
         
         // Load the WebSim HTML structure
-        const response = await fetch('/legacy.html');
+        const response = await fetch('/legacy/index.html');
         const html = await response.text();
         
         // Parse and extract content
@@ -21,7 +21,24 @@ function App() {
         // Insert import map first (before any modules)
         const importMap = doc.querySelector('script[type="importmap"]');
         if (importMap) {
-          document.head.prepend(importMap.cloneNode(true));
+          const fixed = document.createElement('script');
+          fixed.type = 'importmap';
+          try {
+            const json = JSON.parse(importMap.textContent || '{}');
+            if (json.imports) {
+              // Ensure absolute paths under /legacy/
+              const map = {} as Record<string,string>;
+              for (const [k, v] of Object.entries(json.imports)) {
+                map[k] = typeof v === 'string' && v.startsWith('/') ? v : `/legacy/${String(v).replace(/^\.\/?/, '')}`;
+              }
+              fixed.textContent = JSON.stringify({ imports: map }, null, 2);
+            } else {
+              fixed.textContent = importMap.textContent || '';
+            }
+          } catch {
+            fixed.textContent = importMap.textContent || '';
+          }
+          document.head.prepend(fixed);
         }
 
         // Set body content
@@ -30,7 +47,7 @@ function App() {
         // Load WebSim styles
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = '/styles.css';
+        link.href = '/legacy/styles.css';
         document.head.appendChild(link);
 
         // Load Google Fonts
@@ -47,7 +64,7 @@ function App() {
 
         // Initialize WebSim app
         await new Promise(resolve => setTimeout(resolve, 200));
-        const { App } = await import(/* @vite-ignore */ '/app.js');
+        const { App } = await import(/* @vite-ignore */ '/legacy/app.js');
         if (App) {
           new App();
           console.log('VisionStack WebSim loaded successfully');

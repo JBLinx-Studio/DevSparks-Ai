@@ -4,20 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VisionStack</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/legacy/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <!-- Puter.js SDK (required by Puter integration) -->
     <script src="https://js.puter.com/v2/"></script>
     <!-- Puter integration (Lovable-ready UMD/ESM wrapper): ensure compiled JS is loaded before app -->
-    <script type="module" src="/puter_integration.js"></script>
+    <script type="module" src="/legacy/puter_integration.js"></script>
 
     <script type="importmap">
         {
             "imports": {
-                "app": "./app.js",
-                "chatManager": "./chatManager.js",
-                "githubManager": "./githubManager.js",
-                "previewManager": "./previewManager.js",
+                "app": "/legacy/app.js",
+                "chatManager": "/legacy/chatManager.js",
+                "githubManager": "/legacy/githubManager.js",
+                "previewManager": "/legacy/previewManager.js",
                 "react": "https://esm.sh/react@18",
                 "react-dom": "https://esm.sh/react-dom@18",
                 "react-dom/client": "https://esm.sh/react-dom@18/client",
