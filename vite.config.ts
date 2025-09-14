@@ -39,12 +39,6 @@ export default defineConfig(({ mode }) => {
       esbuildOptions: {
         target: 'es2019',
       }
-    },
-    css: {
-      // Force inline PostCSS config so Vite doesn't try to load postcss.config.js (ESM-incompatible here)
-      postcss: {
-        plugins: []
-      }
     }
   };
 });
