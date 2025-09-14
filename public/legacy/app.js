@@ -97,7 +97,6 @@ export class App {
 
         this.initCurrentUser().then(() => {
             this.initPuterStorage().then(() => {
-                this.setupPuterEventListeners(); // Set up Puter sign-in button
                 if (this.conversationHistory.length === 0) {
                     this.chatManager.sendInitialWelcomeMessage();
                 }
@@ -171,29 +170,14 @@ export class App {
 
     async initPuterStorage() {
         try {
-            // Wait for Puter SDK to load
-            let retries = 0;
-            while (!window.Puter && retries < 10) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-                retries++;
-            }
-            
             if (window.Puter) {
                 this.addConsoleMessage('info', 'Puter.AI SDK detected. Attempting to connect to cloud storage...');
                 await Puter.init();
-                
-                // Check if user is already signed in
-                try {
-                    this.puterUser = await Puter.identity.whoami();
-                    this.puterEnabled = true;
-                    this.addConsoleMessage('success', `Puter.AI cloud storage connected for user: ${this.puterUser.username}. Projects will be saved to the cloud.`);
-                    this.updatePuterStatusUI();
-                    this.updateAccountInfoUI();
-                } catch (whoamiError) {
-                    // User not signed in yet
-                    this.addConsoleMessage('info', 'Puter.AI SDK ready but user not signed in. Click "Sign In to Puter" to connect.');
-                    this.updatePuterStatusUI();
-                }
+                this.puterUser = await Puter.identity.whoami();
+                this.puterEnabled = true;
+                this.addConsoleMessage('success', `Puter.AI cloud storage connected for user: ${this.puterUser.username}. Projects will be saved to the cloud.`);
+                this.updatePuterStatusUI();
+                this.updateAccountInfoUI();
 
                 this.addConsoleMessage('info', 'Note: Your DevSpark AI account is automatically linked to your Websim/Puter.AI session. No separate signup/login is required for these platform features.');
 
@@ -232,86 +216,7 @@ export class App {
             } else if (!this.currentProject || !this.projects.some(p => p.id === this.currentProject.id)) {
                 this.addConsoleMessage('info', `Loading the first available project: "${this.projects[0].name}".`);
                 await this.loadProject(this.projects[0]);
-    }
-
-    // Set up Puter sign-in/sign-out event listeners
-    setupPuterEventListeners() {
-        const signInBtn = document.getElementById('puterOptionsSignInBtn');
-        const signOutBtn = document.getElementById('puterOptionsSignOutBtn');
-        const storageInfoBtn = document.getElementById('puterOptionsStorageInfoBtn');
-
-        if (signInBtn) {
-            signInBtn.addEventListener('click', async () => {
-                try {
-                    signInBtn.disabled = true;
-                    signInBtn.textContent = 'Signing in...';
-                    
-                    if (window.Puter && Puter.auth) {
-                        // This should trigger the Puter sign-in popup
-                        this.puterUser = await Puter.auth.signIn();
-                        this.puterEnabled = true;
-                        this.addConsoleMessage('success', `Successfully signed in to Puter.AI as: ${this.puterUser.username}`);
-                        this.updatePuterStatusUI();
-                        this.updateAccountInfoUI();
-                        
-                        // Try to load projects from Puter cloud
-                        await this.loadProjectsFromPuter();
-                    } else {
-                        throw new Error('Puter SDK not available');
-                    }
-                } catch (error) {
-                    console.error('Puter sign-in error:', error);
-                    this.addConsoleMessage('error', `Failed to sign in to Puter.AI: ${error.message}`);
-                } finally {
-                    signInBtn.disabled = false;
-                    signInBtn.textContent = 'Sign In to Puter';
-                }
-            });
-        }
-
-        if (signOutBtn) {
-            signOutBtn.addEventListener('click', async () => {
-                try {
-                    if (window.Puter && Puter.auth) {
-                        await Puter.auth.signOut();
-                    }
-                    this.puterUser = null;
-                    this.puterEnabled = false;
-                    this.addConsoleMessage('info', 'Signed out from Puter.AI');
-                    this.updatePuterStatusUI();
-                    this.updateAccountInfoUI();
-                } catch (error) {
-                    console.error('Puter sign-out error:', error);
-                    this.addConsoleMessage('error', `Failed to sign out: ${error.message}`);
-                }
-            });
-        }
-
-        if (storageInfoBtn) {
-            storageInfoBtn.addEventListener('click', async () => {
-                try {
-                    if (this.puterEnabled && window.Puter) {
-                        const usage = await Puter.fs.usage();
-                        const userInfo = this.puterUser || await Puter.identity.whoami();
-                        
-                        const info = `
-**Puter.AI Storage Info:**
-- User: ${userInfo.username}
-- Used: ${(usage.used / 1024 / 1024).toFixed(2)} MB
-- Available: ${(usage.available / 1024 / 1024).toFixed(2)} MB
-- Total: ${((usage.used + usage.available) / 1024 / 1024).toFixed(2)} MB`;
-                        
-                        this.addConsoleMessage('info', info);
-                    } else {
-                        this.addConsoleMessage('warn', 'Puter.AI not connected. Please sign in first.');
-                    }
-                } catch (error) {
-                    console.error('Storage info error:', error);
-                    this.addConsoleMessage('error', `Failed to get storage info: ${error.message}`);
-                }
-            });
-        }
-    }
+            }
             this._renderProjectListUI();
         } catch (error) {
             this.addConsoleMessage('error', `Failed to initialize Puter.AI cloud storage: ${error.message}. Cloud storage features are unavailable. Falling back to local storage.`);
@@ -331,61 +236,16 @@ export class App {
     }
 
     updatePuterStatusUI() {
-        // Update main status display
         const statusDiv = document.getElementById('cloudStorageStatus');
         if (statusDiv) {
-            if (this.puterEnabled && this.puterUser) {
-                statusDiv.textContent = `Cloud Storage: Connected (Puter.AI - ${this.puterUser.username})`;
+            // Treat PuterShim initialization as "connected" for UI (avoids persistent Local warning)
+            const puterAvailable = this.puterEnabled || (window.PuterShim && window.PuterShim.isInitialized);
+            if (puterAvailable) {
+                statusDiv.textContent = `Cloud Storage: Connected (Puter.AI${this.puterUser ? ` - ${this.puterUser.username}` : ''})`;
                 statusDiv.className = 'cloud-storage-status connected';
-            } else if (window.Puter) {
-                statusDiv.textContent = 'Cloud Storage: Ready (Puter.AI - Click sign in)';
+            } else {
+                statusDiv.textContent = 'Cloud Storage: Local (Puter.AI not connected)';
                 statusDiv.className = 'cloud-storage-status disconnected';
-            } else {
-                statusDiv.textContent = 'Cloud Storage: Local (Puter.AI not available)';
-                statusDiv.className = 'cloud-storage-status disconnected';
-            }
-        }
-        
-        // Update settings modal buttons
-        const accountStatus = document.getElementById('puterAccountStatus');
-        const signInBtn = document.getElementById('puterOptionsSignInBtn');
-        const signOutBtn = document.getElementById('puterOptionsSignOutBtn');
-        const storageInfoBtn = document.getElementById('puterOptionsStorageInfoBtn');
-        const accountDetails = document.getElementById('puterAccountDetails');
-        
-        if (accountStatus) {
-            if (this.puterEnabled && this.puterUser) {
-                accountStatus.textContent = `Connected as: ${this.puterUser.username}`;
-                accountStatus.style.color = 'var(--color-success)';
-            } else if (window.Puter) {
-                accountStatus.textContent = 'Puter SDK ready - Not signed in';
-                accountStatus.style.color = 'var(--color-warning)';
-            } else {
-                accountStatus.textContent = 'Puter SDK not available';
-                accountStatus.style.color = 'var(--color-error)';
-            }
-        }
-        
-        if (signInBtn && signOutBtn) {
-            if (this.puterEnabled && this.puterUser) {
-                signInBtn.style.display = 'none';
-                signOutBtn.style.display = 'inline-block';
-            } else {
-                signInBtn.style.display = 'inline-block';
-                signOutBtn.style.display = 'none';
-            }
-        }
-        
-        if (accountDetails) {
-            if (this.puterEnabled && this.puterUser) {
-                accountDetails.style.display = 'block';
-                accountDetails.innerHTML = `
-                    <strong>Account:</strong> ${this.puterUser.username}<br>
-                    <strong>User ID:</strong> ${this.puterUser.id || 'N/A'}<br>
-                    <strong>Email:</strong> ${this.puterUser.email || 'N/A'}
-                `;
-            } else {
-                accountDetails.style.display = 'none';
             }
         }
     }
