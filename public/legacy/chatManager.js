@@ -570,38 +570,38 @@ export class ChatManager {
         }
     }
 
-    // AI provider routing - prefer Puter AI, fallback to WebSim, then helpful stub
+    // AI provider routing - supports Puter AI and fallback mock responses
     async requestAIResponse(payload) {
         try {
-            // 1) Prefer Puter AI if available
+            // First try Puter AI service if available
             if (window.PuterService && window.PuterService.ai && typeof window.PuterService.ai.chat === 'function') {
-                const resp = await window.PuterService.ai.chat({
-                    model: payload.model || 'gpt-5-nano',
-                    messages: payload.messages,
-                    json: payload.json
-                });
-                const content = (typeof resp?.content === 'string')
-                    ? resp.content
-                    : (typeof resp === 'string')
-                        ? resp
-                        : JSON.stringify(resp);
-                return { content };
+                console.log('Using Puter AI service');
+                const opts = { 
+                    model: 'gpt-5-nano',
+                    messages: payload.messages, 
+                    json: payload.json 
+                };
+                const response = await window.PuterService.ai.chat(opts);
+                return response;
             }
 
-            // 2) Fallback to WebSim if present
-            if (window.websim && websim.chat && websim.chat.completions && typeof websim.chat.completions.create === 'function') {
-                const res = await websim.chat.completions.create(payload);
-                const content = (typeof res?.content === 'string') ? res.content : JSON.stringify(res);
-                return { content };
-            }
-
-            // 3) Final helpful fallback
+            // If no Puter AI, provide intelligent fallback responses
+            console.log('No AI service available, using fallback responses');
             const userMessage = payload.messages[payload.messages.length - 1]?.content || '';
-            return { content: JSON.stringify(this.generateFallbackResponse(userMessage)) };
+            const fallbackResponse = this.generateFallbackResponse(userMessage);
+            
+            return {
+                content: JSON.stringify(fallbackResponse)
+            };
         } catch (err) {
             console.error('AI request failed:', err);
+            // Generate helpful fallback response
             const userMessage = payload.messages[payload.messages.length - 1]?.content || '';
-            return { content: JSON.stringify(this.generateFallbackResponse(userMessage)) };
+            const fallbackResponse = this.generateFallbackResponse(userMessage);
+            
+            return {
+                content: JSON.stringify(fallbackResponse)
+            };
         }
     }
 
