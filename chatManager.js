@@ -296,22 +296,6 @@ export class ChatManager {
         const input = document.getElementById('messageInput');
         const userMessage = input.value.trim();
 
-        // Tweakable: visual send animation duration (ms)
-        /* @tweakable [duration of the send button pulse animation in milliseconds] */ 
-        const sendButtonPulseMs = 420;
-
-        // Quick visual feedback on the send button
-        try {
-            const sendBtn = document.getElementById('sendBtn');
-            if (sendBtn) {
-                sendBtn.classList.add('sending');
-                setTimeout(() => sendBtn.classList.remove('sending'), sendButtonPulseMs);
-                // temporarily disable to avoid duplicate clicks
-                sendBtn.disabled = true;
-                setTimeout(() => { if (sendBtn) sendBtn.disabled = false; }, 600);
-            }
-        } catch (e) { /* non-critical */ }
-
         if (!userMessage) return;
 
         this.app.addMessage('user', userMessage);
