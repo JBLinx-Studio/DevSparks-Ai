@@ -1,13 +1,7 @@
 import { defineConfig } from 'vite';
-import vue from '@vitejs/plugin-vue';
 import react from '@vitejs/plugin-react';
-import legacy from '@vitejs/plugin-legacy';
-import { svelte } from '@sveltejs/vite-plugin-svelte';
-import solidPlugin from 'vite-plugin-solid';
 import { resolve } from 'path';
 
-// ...existing code...
-// New Vite configuration enabling multi-framework compilation and PostCSS/Tailwind
 export default defineConfig(({ mode }) => {
   const isDev = mode === 'development';
   return {
@@ -20,25 +14,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
-      vue(),
-      svelte(),
-      solidPlugin(),
-      legacy({
-        targets: ['defaults', 'not IE 11'],
-      }),
     ],
-    css: {
-      postcss: {
-        plugins: [
-          require('tailwindcss'),
-          require('autoprefixer'),
-        ],
-      },
-      preprocessorOptions: {
-        scss: { /* ...existing code... */ },
-        less: { /* ...existing code... */ },
-      },
-    },
     build: {
       outDir: 'dist',
       sourcemap: isDev,
@@ -53,7 +29,7 @@ export default defineConfig(({ mode }) => {
       assetsInlineLimit: 4096,
     },
     server: {
-      port: 5173,
+      port: 8080,
       open: false,
       fs: {
         strict: false,
