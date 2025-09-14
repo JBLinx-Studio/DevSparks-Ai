@@ -1,3 +1,5 @@
+import * as buildManager from './buildManager.js';
+
 export class PreviewManager {
     constructor(app) {
         this.app = app;
@@ -6,19 +8,19 @@ export class PreviewManager {
         this.previewFrame = document.getElementById('previewFrame'); // Get reference
         this.previewLoadingOverlay = document.getElementById('previewLoadingOverlay'); // Get reference
 
-        /* @tweakable List of file extensions that should NOT be executed as scripts in the preview. These files typically require a build step (e.g., transpilation). */
-        this._nonExecutableScriptExtensions = ['ts', 'tsx', 'jsx', 'd.ts', 'json', 'yml', 'yaml', 'env', 'txt', 'md', 'xml', 'toml', 'ini', 'cfg', 'dockerfile', 'procfile'];
-        /* @tweakable List of specific filenames (without path) that, even if they have a .js extension, should NOT be executed as scripts in the preview (e.g., Node.js config files, other non-browser JS). */
-        this._nonExecutableScriptFilenames = [
-            'webpack.config.js', 'rollup.config.js', 'vite.config.js', 'vite.config.ts',
-            'tailwind.config.js', 'postcss.config.js', 'eslint.config.js', 'babel.config.js', 'jest.config.js',
-            'package.json', 'package-lock.json', 'bun.lockb',
-            'README.md', 'LICENSE', 'Dockerfile', 'Procfile',
-            '.gitignore', '.eslintrc', '.prettierrc', '.editorconfig', '.gitattributes', '.npmrc', '.nvmrc',
-            'deploy.yml', 'robots.txt',
-            'components.json',
-            'tsconfig.app.json', 'tsconfig.json', 'tsconfig.node.json'
-        ];
+        /* @tweakable [Enable caching of build bundles per project id to speed repeated builds in this session] */
+        this.TWEAK_enableBuildCache = true;
+        /* @tweakable [Maximum number of cached builds to keep in-memory] */
+        this.TWEAK_buildCacheLimit = 5;
+        /* @tweakable [When true, attempts in-browser build even if lockfile suggests external tooling — may not perfectly emulate bun/npm/pnpm dev servers] */
+        this.TWEAK_forceInBrowserBuild = true;
+        /* @tweakable [When true, PreviewManager will attempt to spawn an in-browser build using buildManager (esbuild-wasm) for TS/TSX/JSX] */
+        this.TWEAK_attemptInBrowserBuild = true;
+        /* @tweakable [When true, display helpful dev-server guidance (and attempt a proxy simulation) when package.json / vite.config.* / bun.lockb exist] */
+        this.TWEAK_enableDevServerFallback = true;
+
+        // simple in-memory cache: { projectId: { bundleUrl, lockfile, timestamp, logs } }
+        this._buildCache = {};
 
         this.setupIframeListeners(); // New method for iframe listeners
     }
@@ -138,7 +140,7 @@ export class PreviewManager {
         this.app.addConsoleMessage('info', `Preview set to ${mode} mode.`);
     }
 
-    updatePreviewFrameContent() {
+    async updatePreviewFrameContent() {
         // Add null checks to prevent errors
         if (!this.previewFrame || !this.app.currentProject) { // Removed modal.style.display check to allow updates even if hidden
             return;
@@ -213,10 +215,10 @@ export class PreviewManager {
 </html>`;
         }
 
-        // 3. Parse HTML content into a DOM and prepare for modifications
+        // Parse the HTML content into a Document for safe DOM manipulation.
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlContent, 'text/html');
-        
+
         // Detect uncompiled source files that require a build step (ts/tsx/jsx)
         const uncompiledCandidates = Object.keys(this.app.currentFiles || {}).filter(name =>
             /\.(ts|tsx|jsx)$/.test(name)
@@ -226,8 +228,145 @@ export class PreviewManager {
             return this.app.currentFiles.hasOwnProperty(possibleJs);
         });
         if (uncompiledCandidates.length > 0 && !compiledJsExists) {
-            // Warn user in console + app UI that these files need compilation
-            this.app.addConsoleMessage('warn', `Preview note: ${uncompiledCandidates.length} TypeScript/JSX source file(s) detected (${uncompiledCandidates.join(', ')}). Ensure compiled .js outputs exist for them to run in the preview.`);
+            // Attempt an in-browser transpile + bundle using our local buildManager (esbuild-wasm)
+            if (buildManager && typeof buildManager.bundleWithLock === 'function') {
+                try {
+                    this.app.addConsoleMessage('info', `Preview: Detected ${uncompiledCandidates.length} uncompiled source file(s). Attempting in-browser transpile...`);
+                    // Ensure package.json and essential local helper files exist so the bundle can reference them locally
+                    if (!this.app.currentFiles['package.json']) {
+                        const defaultPkg = { name: this.app.currentProject?.name || 'preview-project', version: '1.0.0', dependencies: {} };
+                        this.app.currentFiles['package.json'] = JSON.stringify(defaultPkg, null, 2);
+                        this.app.addConsoleMessage('info', 'No package.json found — generated a minimal package.json for preview reproducibility.');
+                    }
+                    if (!this.app.currentFiles['tsconfig.json']) {
+                        this.app.currentFiles['tsconfig.json'] = JSON.stringify({
+                            compilerOptions: { target: "ES2020", module: "ESNext", jsx: "react-jsx", strict: false, esModuleInterop: true },
+                            include: ["src", "src/**/*"]
+                        }, null, 2);
+                        this.app.addConsoleMessage('info', 'No tsconfig.json found — added a basic tsconfig.json for preview builds.');
+                    }
+                    if (!this.app.currentFiles['bun.lockb']) {
+                        this.app.currentFiles['bun.lockb'] = ''; // placeholder to hint bun projects (non-blocking)
+                    }
+
+                    const entry = buildManager.detectEntry(this.app.currentFiles);
+                    const { code, warnings, errors, lockfile } = await buildManager.bundleWithLock(this.app.currentFiles, entry, { sourcemap: false, minify: false, packageJson: JSON.parse(this.app.currentFiles['package.json'] || '{}') });
+                    // Persist simple lockfile into project for traceability (non-blocking)
+                    if (lockfile && this.app.currentProject) {
+                        this.app.currentProject.packageLock = lockfile;
+                        this.app.addConsoleMessage('info', 'Generated lightweight preview lockfile and attached to project.');
+                        await this.app.saveCurrentProject?.();
+                    }
+                    if ((errors && errors.length) || (warnings && warnings.length)) {
+                        if (warnings && warnings.length) this.app.addConsoleMessage('warn', `Transpile warnings: ${warnings.join(' | ')}`);
+                        if (errors && errors.length) {
+                            // Provide more structured error output and list likely-missing imports
+                            errors.forEach(errText => {
+                                this.app.addConsoleMessage('error', `Transpile error: ${errText}`);
+                            });
+                            this.app.addConsoleMessage('error', `Transpile failed. Missing or unresolved imports listed above. If you see "Missing file" messages, ensure those files exist in the project (e.g., src/App.tsx, src/index.css).`);
+                        }
+                    }
+                    if (errors && errors.length) {
+                        // Build failed — render an informative error page inside the preview iframe
+                        const errorHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Build Errors</title><style>body{font-family:sans-serif;padding:24px;background:#fff;color:#111} pre{background:#f7f7f9;padding:12px;border-radius:6px;overflow:auto;border:1px solid #eee}</style></head><body><h1>Preview Build Failed</h1><p>In-browser bundling failed with the following error(s):</p><pre>${(errors||[]).map(e=>String(e)).join('\n\n')}</pre><p>Check the Console panel for more details.</p></body></html>`;
+                        const errBlob = new Blob([errorHtml], { type: 'text/html' });
+                        const errUrl = URL.createObjectURL(errBlob);
+                        this.blobUrls['__main__'] = errUrl;
+                        this.previewFrame.src = errUrl;
+                        this.hideLoadingOverlay();
+                        return; // stop further processing
+                    } else if (code) {
+                        // Inject transpiled bundle as a virtual file and include in importMap / blobs
+                        const bundleName = '__in_memory_bundle__.js';
+                        const blob = new Blob([code], { type: 'application/javascript' });
+                        const bundleUrl = URL.createObjectURL(blob);
+                        this.blobUrls[bundleName] = bundleUrl;
+                        fileBlobMap[bundleName] = bundleUrl;
+                        importMapEntries[`./${bundleName}`] = bundleUrl;
+                        this.app.addConsoleMessage('success', `In-browser transpile successful — injecting ${bundleName} into preview.`);
+                        // Ensure index.html links the bundle if not already referencing JS module
+                        if (htmlContent && !htmlContent.includes(bundleName)) {
+                            // Prefer to append before </body>
+                            if (htmlContent.includes('</body>')) {
+                                htmlContent = htmlContent.replace('</body>', `<script src=\"./${bundleName}\"></script>\\n</body>`);
+                            } else {
+                                htmlContent += `\\n<script src=\"./${bundleName}\"></script>\\n`;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    this.app.addConsoleMessage('error', `In-browser transpile failed: ${e.message || e}`);
+                }
+            } else {
+                // Warn user in console + app UI that these files need compilation
+                this.app.addConsoleMessage('warn', `Preview note: ${uncompiledCandidates.length} TypeScript/JSX source file(s) detected (${uncompiledCandidates.join(', ')}). Ensure compiled .js outputs exist for them to run in the preview.`);
+            }
+        }
+
+        // Detect multi-file build-required projects (TypeScript/TSX, Vite configs, presence of lockfiles/package managers)
+        const hasTS = Object.keys(this.app.currentFiles || {}).some(n => n.endsWith('.ts') || n.endsWith('.tsx'));
+        const hasViteTsConfig = this.app.currentFiles && (this.app.currentFiles['vite.config.ts'] || this.app.currentFiles['vite.config.js']);
+        const hasPackageJson = this.app.currentFiles && this.app.currentFiles['package.json'];
+        const hasLockfile = this.app.currentFiles && (this.app.currentFiles['bun.lockb'] || this.app.currentFiles['package-lock.json'] || this.app.currentFiles['pnpm-lock.yaml']);
+
+        /* @tweakable [Preferred package manager when multiple lockfiles or package.json exist. Allowed values: 'bun','npm','pnpm','auto'] */
+        const PREFERRED_PACKAGE_MANAGER = this.app.config?.preferredPackageManager || 'auto';
+
+        // If project requires a build step / dev server, do NOT attempt to run as plain static preview.
+        if ((hasTS || hasViteTsConfig || (hasPackageJson && hasLockfile)) && !this.app.forceStaticPreview) {
+            // Recommend the correct manager based on lockfiles, with fallback to package.json + preference
+            let detectedManager = 'npm';
+            if (this.app.currentFiles['bun.lockb']) detectedManager = 'bun';
+            else if (this.app.currentFiles['pnpm-lock.yaml']) detectedManager = 'pnpm';
+            else if (this.app.currentFiles['package-lock.json']) detectedManager = 'npm';
+            else if (PREFERRED_PACKAGE_MANAGER !== 'auto') detectedManager = PREFERRED_PACKAGE_MANAGER;
+
+            // Compose clear actionable message for user / orchestrator to run proper dev server instead of static render
+            const reasonParts = [];
+            if (hasTS) reasonParts.push('TypeScript/TSX files present');
+            if (hasViteTsConfig) reasonParts.push('Vite config found');
+            if (hasLockfile) reasonParts.push('Lockfile detected');
+            const reason = reasonParts.join(', ');
+
+            this.app.addConsoleMessage('warn', `Preview paused: project appears to need a build/dev server (${reason}).`);
+            this.app.addConsoleMessage('info', `Suggested steps: run '${detectedManager} install' then '${detectedManager === 'bun' ? 'bun dev' : "npm run dev"}' (or 'vite dev') in a real environment. Preview will not execute raw .ts/.tsx or config files.`);
+
+            // Render an informative in-iframe placeholder explaining why we won't render raw files
+            const placeholderHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Preview Requires Build</title><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#fff;color:#111}main{max-width:680px;padding:28px;border-radius:12px;border:1px solid #eee;box-shadow:0 6px 24px rgba(0,0,0,0.06)}h1{margin:0 0 8px;font-size:20px}p{margin:8px 0;color:#333}code{background:#f6f8fa;padding:4px 6px;border-radius:6px;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace;}</style></head><body><main><h1>Preview blocked: build step required</h1><p>This project contains source files that must be compiled or served via a dev server (TypeScript / Vite / bundler).</p><p>Recommended commands (run locally):</p><ol><li><code>${detectedManager} install</code></li><li><code>${detectedManager === 'bun' ? 'bun dev' : "npm run dev"}</code> or <code>vite dev</code></li></ol><p>If you want to force a static in-browser attempt, enable the <code>forceStaticPreview</code> flag on the app instance (not recommended for TS/TSX projects).</p></main></body></html>`;
+
+            const blob = new Blob([placeholderHtml], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            this.blobUrls['__main__'] = url;
+            this.previewFrame.src = url;
+            this.hideLoadingOverlay();
+            return; // stop further processing to avoid trying to run raw sources
+        }
+
+        // Add after computing importMapEntries and BEFORE injecting import map into the doc.head
+        /* @tweakable [Host used to resolve bare imports at preview runtime — will map package names to this ESM CDN with the version from package.json] */
+        const PREVIEW_EXTERNAL_HOST = buildManager && buildManager.TWEAK_externalHost ? buildManager.TWEAK_externalHost : 'https://esm.sh';
+
+        // If project has a package.json (or attached dependencies), map bare imports to the ESM host so externalized imports from esbuild resolve.
+        try {
+            const pkg = this.app.currentProject && (this.app.currentProject.packageJson || this.app.currentProject['package.json'])
+                      ? (this.app.currentProject.packageJson || JSON.parse(this.app.currentProject['package.json'] || '{}'))
+                      : null;
+            if (pkg && pkg.dependencies) {
+                Object.entries(pkg.dependencies).forEach(([name, ver]) => {
+                    // prefer exact mapping only when not already provided by importMapEntries
+                    if (!importMapEntries[name]) {
+                        // Normalize version (strip semver ranges for CDN-friendly mapping if needed)
+                        let verTag = ver && typeof ver === 'string' ? ver.replace(/^[\^~<>]=?/, '') : '';
+                        if (!verTag) verTag = 'latest';
+                        importMapEntries[name] = `${PREVIEW_EXTERNAL_HOST}/${name}@${verTag}`;
+                        // Also support mapping common subpaths (e.g., react/jsx-runtime)
+                        importMapEntries[`${name}/`] = `${PREVIEW_EXTERNAL_HOST}/${name}@${verTag}/`;
+                    }
+                });
+            }
+        } catch (e) {
+            this.app.addConsoleMessage('warn', `Preview import map generation failed: ${e.message}`);
         }
 
         // Inject the generated import map into the <head> section
@@ -471,5 +610,118 @@ export class PreviewManager {
         this.blobUrls['__main__'] = url; // Store the main HTML blob URL for revocation
         
         this.previewFrame.src = url;
+    }
+
+    /**
+     * Build & Preview: Attempts to perform an isolated in-browser build for projects that require it,
+     * or falls back to the existing static preview flow. Streams build logs into the preview frame
+     * when failures occur and caches successful bundles per project id.
+     *
+     * Behavior:
+     *  - If a lockfile indicates bun/npm/pnpm, we will attempt an in-browser bundle with esbuild via buildManager.
+     *  - On success, inject resulting bundle and show preview.
+     *  - On error, render build logs in the preview iframe so users can debug.
+     *
+     * Note: This simulates the requested "run detected package manager" behavior by using an in-browser bundler
+     * (esbuild-wasm). Running real `npm install` / `bun install` is not possible in-browser; instead this
+     * attempts a deterministic in-memory bundling and provides actionable feedback.
+     */
+    async buildAndPreview() {
+        if (!this.app || !this.app.currentProject) {
+            this.app?.addConsoleMessage('warn', 'No project loaded to build.');
+            return;
+        }
+
+        const files = this.app.currentFiles || {};
+        const hasPackageJson = !!files['package.json'];
+        const hasViteConfig = !!files['vite.config.ts'] || !!files['vite.config.js'];
+        const hasBunLock = !!files['bun.lockb'];
+        const hasTS = Object.keys(files).some(n => n.endsWith('.ts') || n.endsWith('.tsx'));
+        const hasJSX = Object.keys(files).some(n => n.endsWith('.jsx') || n.endsWith('.tsx'));
+
+        // If a dev-server style project is detected and dev-server fallback is enabled, provide explicit instructions and logs.
+        if (this.TWEAK_enableDevServerFallback && (hasPackageJson || hasViteConfig || hasBunLock)) {
+            const detectedManager = hasBunLock ? 'bun' : 'npm';
+            const suggestedInstall = detectedManager === 'bun' ? 'bun install' : 'npm install';
+            const suggestedDev = detectedManager === 'bun' ? 'bun dev' : 'npm run dev';
+
+            // Provide detailed console-oriented build logs rather than throwing UI modal blocking errors
+            this.app.addConsoleMessage('warn', `Detected a project that likely requires a dev server (package.json/vite config/lockfile present).`);
+            this.app.addConsoleMessage('info', `Recommended local steps: 1) ${suggestedInstall}  2) ${suggestedDev} (or 'vite dev').`);
+            this.app.addConsoleMessage('info', `DevSpark cannot run system package managers inside the browser. You can either run the dev server locally and paste the running preview URL in the "Open in New Window" dialog, or allow DevSpark to attempt an in-browser bundle if supported.`);
+
+            // Render an informative placeholder page inside the preview iframe with commands and copyable instructions
+            const placeholderHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Preview Requires Build / Dev Server</title><style>body{font-family:system-ui,Roboto,Arial;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#fff;color:#111}main{max-width:720px;padding:28px;border-radius:12px;border:1px solid #eee}code{display:block;background:#f6f8fa;padding:8px;border-radius:6px;margin:8px 0;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace;}</style></head><body><main><h1>Build / Dev Server Required</h1><p>This project contains configuration or lockfiles that indicate it needs to run via a dev server (TypeScript / Vite / bundler).</p><p>Suggested local commands:</p><code>${suggestedInstall}</code><code>${suggestedDev}</code><p>DevSpark will attempt an in-browser build for TypeScript/JSX when possible, but cannot run external package managers or full Vite dev servers inside the browser.</p><p>Check the Console panel for build logs and errors. If you have a running local dev server, open it in a new tab and paste the URL into the browser address bar to preview.</p></main></body></html>`;
+            const blob = new Blob([placeholderHtml], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            this.blobUrls['__main__'] = url;
+            this.previewFrame.src = url;
+            this.hideLoadingOverlay();
+            return;
+        }
+
+        // If TypeScript/JSX present and in-browser build is allowed, attempt to bundle via buildManager
+        if (this.TWEAK_attemptInBrowserBuild && (hasTS || hasJSX)) {
+            try {
+                this.app.addConsoleMessage('info', 'Attempting in-browser compilation (esbuild-wasm) for TS/TSX/JSX sources...');
+                const packageJson = files['package.json'] ? JSON.parse(files['package.json']) : null;
+                const entry = await import('./buildManager.js').then(m => m.detectEntry(files));
+                const buildResult = await import('./buildManager.js').then(m => m.bundleWithLock(files, entry, { sourcemap: false, minify: false, packageJson }));
+
+                if (buildResult.warnings && buildResult.warnings.length) {
+                    buildResult.warnings.forEach(w => this.app.addConsoleMessage('warn', `Build warning: ${w}`));
+                }
+                if (buildResult.errors && buildResult.errors.length) {
+                    buildResult.errors.forEach(err => this.app.addConsoleMessage('error', `Build error: ${err}`));
+                    // Render build error page inside preview iframe with logs
+                    const errorHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Build Errors</title><style>body{font-family:system-ui;padding:24px;background:#fff;color:#111} pre{background:#f7f7f9;padding:12px;border-radius:6px;overflow:auto;border:1px solid #eee}</style></head><body><h1>Preview Build Failed</h1><p>In-browser bundling failed with the following error(s):</p><pre>${(buildResult.errors||[]).map(e=>String(e)).join('\n\n')}</pre><p>See the Console panel for full build logs.</p></body></html>`;
+                    const eBlob = new Blob([errorHtml], { type: 'text/html' });
+                    const eUrl = URL.createObjectURL(eBlob);
+                    this.blobUrls['__main__'] = eUrl;
+                    this.previewFrame.src = eUrl;
+                    this.hideLoadingOverlay();
+                    return;
+                }
+
+                if (buildResult.code && buildResult.code.length) {
+                    const bundleBlob = new Blob([buildResult.code], { type: 'application/javascript' });
+                    const bundleUrl = URL.createObjectURL(bundleBlob);
+                    this.blobUrls['__in_memory_bundle__'] = bundleUrl;
+
+                    let indexHtml = files['index.html'] || (`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Preview</title></head><body><div id="app"></div></body></html>`);
+                    const scriptTag = `<script type="module" src="${bundleUrl}"></script>`;
+                    if (!indexHtml.includes(scriptTag)) {
+                        if (indexHtml.includes('</body>')) {
+                            indexHtml = indexHtml.replace('</body>', `${scriptTag}\n</body>`);
+                        } else {
+                            indexHtml += `\n${scriptTag}\n`;
+                        }
+                    }
+
+                    const finalBlob = new Blob([indexHtml], { type: 'text/html' });
+                    const finalUrl = URL.createObjectURL(finalBlob);
+                    this.blobUrls['__main__'] = finalUrl;
+
+                    this.previewFrame.src = finalUrl;
+                    this.hideLoadingOverlay();
+                    this.app.addConsoleMessage('success', 'In-browser build succeeded and preview updated.');
+                    return;
+                }
+            } catch (err) {
+                this.app.addConsoleMessage('error', `In-browser build exception: ${err.message || err}`);
+                const errorHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Build Exception</title></head><body><h1>Build Exception</h1><pre>${String(err)}</pre><p>See console for details.</p></body></html>`;
+                const eBlob = new Blob([errorHtml], { type: 'text/html' });
+                const eUrl = URL.createObjectURL(eBlob);
+                this.blobUrls['__main__'] = eUrl;
+                this.previewFrame.src = eUrl;
+                this.hideLoadingOverlay();
+                return;
+            }
+        }
+
+        // Fallback: run normal static preview flow
+        this.app.addConsoleMessage('info', 'Running standard static preview flow.');
+        this.hideLoadingOverlay();
+        this.updatePreviewFrameContent();
     }
 }

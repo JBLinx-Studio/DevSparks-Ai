@@ -62,11 +62,22 @@ export class App {
             { id: "hi-male", name: "Hindi (Male)" }
         ];
 
-        this.aiProvider = localStorage.getItem('aiProvider') || 'websim';
-        this.aiApiKey = localStorage.getItem('aiApiKey') || '';
+        // Pre-populate a curated list of selectable assistants (either Websim or Puter-hosted models).
+        // Use provider id format "<backend>:<model>" where backend is "websim" or "puter".
         this.availableAIProviders = [
             { id: 'websim', name: 'Websim AI (Default)' }
         ];
+
+        // add Puter provider option so users can select it in Settings (frontend-only if PuterService present)
+        this.availableAIProviders.push({ id: 'puter:default', name: 'Puter AI (Account)' });
+        this.availableAIProviders.push({ id: 'puter:kimmy-k2', name: 'Kimmy K2 (Puter)' });
+        this.availableAIProviders.push({ id: 'puter:gemini-2.5-flash', name: 'Gemini 2.5 Flash (Puter)' });
+        this.availableAIProviders.push({ id: 'websim:gpt5-mini', name: 'gpt5 Mini (Websim)' });
+        this.availableAIProviders.push({ id: 'websim:gpt5-nano', name: 'gpt5 Nano (Websim - default)' });
+
+        // Load persisted AI provider selection (fallback to websim:gpt5-nano)
+        this.aiProvider = localStorage.getItem('aiProvider') || 'websim:gpt5-nano';
+        this.aiApiKey = localStorage.getItem('aiApiKey') || '';
 
         this.notificationSound = new Audio();
         this.createNotificationSound();
@@ -227,7 +238,9 @@ export class App {
     updatePuterStatusUI() {
         const statusDiv = document.getElementById('cloudStorageStatus');
         if (statusDiv) {
-            if (this.puterEnabled) {
+            // Treat PuterShim initialization as "connected" for UI (avoids persistent Local warning)
+            const puterAvailable = this.puterEnabled || (window.PuterShim && window.PuterShim.isInitialized);
+            if (puterAvailable) {
                 statusDiv.textContent = `Cloud Storage: Connected (Puter.AI${this.puterUser ? ` - ${this.puterUser.username}` : ''})`;
                 statusDiv.className = 'cloud-storage-status connected';
             } else {
@@ -254,8 +267,19 @@ export class App {
         document.getElementById('githubBtn').addEventListener('click', () => this.githubManager.showGithubModal());
         document.getElementById('connectGithubBtn').addEventListener('click', () => this.githubManager.connectGithub());
         document.getElementById('syncBtn').addEventListener('click', () => this.githubManager.syncToGithub());
+        // Small, non-breaking enhancement: create a local checkpoint snapshot for the current project
+        document.getElementById('checkpointBtn')?.addEventListener('click', () => this.createCheckpoint());
 
         document.getElementById('previewBtn').addEventListener('click', () => this.previewManager.showPreview());
+        // New: build & preview button triggers a (safe) in-browser build pipeline
+        /* @tweakable [Label for the build button shown inside the Preview modal] */
+        this.buildButtonLabel = 'Build & Compile';
+        // Wire Build button inside the Preview modal to trigger an in-browser compile/bundle
+        document.getElementById('buildCompileBtn')?.addEventListener('click', () => this.previewManager.buildAndPreview());
+        // Keep the legacy hidden button in-place for backward compatibility but update its text (hidden)
+        const legacyBuildBtn = document.getElementById('buildPreviewBtn');
+        if (legacyBuildBtn) { legacyBuildBtn.textContent = this.buildButtonLabel; legacyBuildBtn.title = this.buildButtonLabel; }
+
         document.getElementById('closePreviewBtn').addEventListener('click', () => this.previewManager.hidePreview());
 
         document.getElementById('refreshPreviewBtn').addEventListener('click', () => this.refreshPreview());
@@ -446,6 +470,16 @@ export class App {
             }
         });
 
+        // Accessibility: allow keyboard activation of the 3-dot file menu (Enter / Space)
+        document.getElementById('fileTreeContainer').addEventListener('keydown', (e) => {
+            const btn = e.target.closest?.('.file-more-btn');
+            if (!btn) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                btn.click();
+            }
+        });
+
         document.getElementById('projectList').addEventListener('click', async (e) => {
             const renameBtn = e.target.closest('.rename-project-btn');
             const deleteBtn = e.target.closest('.delete-project-btn');
@@ -536,6 +570,31 @@ export class App {
                 }
             }
         });
+
+        // Close any open ".more-menu" when pressing Escape for accessibility/quick dismiss
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.more-menu').forEach(m => { m.style.display = 'none'; m.closest('.tree-file-item')?.classList?.remove('more-open'); });
+                this.closeContextMenu();
+            }
+        });
+
+        // Reposition any visible ".more-menu" on window resize/scroll to stay aligned with their buttons
+        const repositionOpenMenus = () => {
+            document.querySelectorAll('.tree-file-item.more-open').forEach(item => {
+                const moreBtn = item.querySelector('.file-more-btn');
+                const menu = item.querySelector('.more-menu');
+                if (moreBtn && menu && (menu.style.display === 'flex' || menu.style.display === 'block')) {
+                    const rect = moreBtn.getBoundingClientRect();
+                    const computedTop = rect.bottom + window.scrollY + 6;
+                    const computedLeft = Math.max(8, rect.left + window.scrollX);
+                    menu.style.top = `${computedTop}px`;
+                    menu.style.left = `${computedLeft}px`;
+                }
+            });
+        };
+        window.addEventListener('resize', repositionOpenMenus);
+        window.addEventListener('scroll', repositionOpenMenus, true);
 
         window.addEventListener('message', (event) => {
             if (event.data && event.data.type === 'console-log') {
@@ -744,7 +803,7 @@ export class App {
             speakerIcon.title = 'Listen to response';
             speakerIcon.innerHTML = `
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-mic-fill" viewBox="0 0 16 16">
-                    <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h6a1 1 0 0 1 1 1v3.5h5z"/>
+                    <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-2 2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2h6a2 2 0 0 0 2 2v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4h-.5a1 1 0 0 0-1 1V2a1 1 0 0 0 1-1h12z"/>
                 </svg>
             `;
             speakerIcon.dataset.messageContent = content; 
@@ -816,8 +875,6 @@ export class App {
             await this.loadInternalScriptsContent();
         } else if (panelName === 'deploy') {
             await this.loadDeploymentInfo();
-        } else if (panelName === 'comments') {
-            await this.commentsManager.loadAndRenderComments();
         }
     }
 
@@ -1003,7 +1060,15 @@ export class App {
                     minimap: { enabled: false },
                     fontFamily: "'Source Code Pro', 'Space Mono', monospace",
                     fontSize: 14,
-                    tabSize: 2
+                    tabSize: 2,
+                    lineNumbers: 'on',                // show line numbers
+                    renderLineHighlight: 'all',      // subtle highlight for current line + gutter
+                    renderWhitespace: 'boundary',    // show whitespace lightly for better alignment
+                    wordWrap: 'off',                 // wrap disabled for code clarity
+                    scrollBeyondLastLine: false,
+                    smoothScrolling: true,
+                    folding: true,                   // enable folding
+                    automaticLayout: true
                 });
 
                 // When Monaco content changes update app state and trigger build/preview
@@ -1467,6 +1532,27 @@ export class App {
         }
     }
 
+    // Create a compact, local checkpoint (non-destructive). Keeps recent 20 snapshots.
+    async createCheckpoint() {
+        if (!this.currentProject) {
+            this.showTemporaryFeedback('No project loaded to checkpoint.', 'warn');
+            return;
+        }
+        const key = 'devspark_checkpoints';
+        const list = JSON.parse(localStorage.getItem(key) || '[]');
+        list.unshift({
+            checkpointId: Date.now().toString(),
+            projectId: this.currentProject.id,
+            projectName: this.currentProject.name,
+            timestamp: new Date().toISOString(),
+            files: { ...this.currentFiles }
+        });
+        // Keep the list reasonably small
+        localStorage.setItem(key, JSON.stringify(list.slice(0, 20)));
+        this.addConsoleMessage('info', `Checkpoint created for "${this.currentProject.name}" (saved ${list[0].checkpointId}).`);
+        this.showTemporaryFeedback('Checkpoint created and saved to local storage.', 'success');
+    }
+
     _renderProjectListUI() {
         const projectList = document.getElementById('projectList');
         projectList.innerHTML = '';
@@ -1483,12 +1569,12 @@ export class App {
                 <div class="project-actions">
                     <button class="btn btn-icon btn-sm rename-project-btn" title="Rename Project">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil" viewBox="0 0 16 16">
-                            <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h6a1 1 0 0 1 1 1v3.5h5z"/>
+                            <path d="M12.146.146a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .447.447l.14.718A5.53 5.53 0 0 0 8 16a5.53 5.53 0 0 0-3.594-1.399l-.796-.796a.5.5 0 0 1-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 1-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z"/>
                         </svg>
                     </button>
                     <button class="btn btn-icon btn-sm delete-project-btn" title="Delete Project">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
-                            <path d="M5.5 2H6a2 2 0 0 0 2 2v10a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2V4a2 2 0 0 0 2-2h6a1 1 0 0 0 1 1v3.5h5z"/>
+                            <path d="M5.5 2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2h6a2 2 0 0 0 2 2v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4h-.5a1 1 0 0 0-1 1V2a1 1 0 0 0 1-1h12z"/>
                         </svg>
                     </button>
                 </div>
@@ -1847,7 +1933,7 @@ export class App {
         videoItem.className = 'context-menu-item';
         videoItem.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-film" viewBox="0 0 16 16">
-                <path d="M3 2h4v10H3V2zm6 0h4v10h-4V2z"/>
+                <path d="M3 2h10v10H3V2zm6 0h4v10h-4V2z"/>
             </svg>
             Generate Video
         `;
@@ -2121,15 +2207,15 @@ export class App {
             </svg>`,
             'image': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-image" viewBox="0 0 16 16"><path d="M6.002 5.5a1.5 1.5 0 0 1-3 0 1.5 1.5 0 0 1 3 0z"/><path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2h6a2 2 0 0 0 2 2v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4h-.5a1 1 0 0 0-1 1V2a1 1 0 0 0 1-1h12z"/>
             </svg>`,
-            'video': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-camera-video-fill" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M0 8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h6a1 1 0 0 1 1 1v3.5h5z"/>
+            'video': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-camera-video-fill" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M0 8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2h6a2 2 0 0 0 2 2v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4h-.5a1 1 0 0 0-1 1V2a1 1 0 0 0 1-1h12z"/>
             </svg>`,
-            'json': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-filetype-json" viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h6a1 1 0 0 1 1 1v3.5h5z"/>
+            'json': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-filetype-json" viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h6a1 1 0 0 0 1 1v3.5h5z"/>
             </svg>`,
-            'md': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-markdown" viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h6a1 1 0 0 1 1 1v3.5h5z"/>
+            'md': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-markdown" viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h6a1 1 0 0 0 1 1v3.5h5z"/>
             </svg>`,
             'config': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-sliders" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11 2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2h6a2 2 0 0 0 2 2v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4h-.5a1 1 0 0 0-1 1V2a1 1 0 0 0 1-1h12z"/>
             </svg>`,
-            'env': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear" viewBox="0 0 16 16"><path d="M8 1a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h6a1 1 0 0 1 1 1v3.5h5z"/>
+            'env': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear" viewBox="0 0 16 16"><path d="M8 1a2 2 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1V2a1 1 0 0 0 1 1h12z"/>
             </svg>`,
             'lock': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-lock" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M14 4.5V14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h6a1 1 0 0 1 1 1v3.5h5z"/>
             </svg>`,
@@ -2143,10 +2229,6 @@ export class App {
             </svg>`,
             'folder-open': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-folder-open" viewBox="0 0 16 16"><path d="M1.5 1H.5L.04 1.63C.017 1.905 0 2.213 0 2.5v11C0 13.88 0 14 1 14h14a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H1.5zm12 1a1 1 0 0 1 1 1v3.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
             </svg>`,
-            'arrow-right': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-right" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .447.447l.14.718A5.53 5.53 0 0 0 8 16a5.53 5.53 0 0 0-3.594-1.399l-.796-.796a.5.5 0 0 1-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 1-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z"/>
-            </svg>`,
-            'arrow-down': `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-down" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .447.447l.14.718A5.53 5.53 0 0 0 8 16a5.53 5.53 0 0 0-3.594-1.399l-.796-.796a.5.5 0 0 1-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 1-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z"/>
-            </svg>`
         };
 
         const appendCategory = (categoryTitle, files, typeIconKey) => {
@@ -2591,7 +2673,7 @@ Check your console and the live preview to see if the bundled code functions as 
                 // small delay: faster than human typing
                 await new Promise(r => setTimeout(r, 18)); // ~18ms per word -> quick stream
             }
-            // finalize content: render markdown safely (use marked + DOMPurify if available)
+            // finalize content: render markdown safely (use marked + DOMPurray if available)
             try {
                 streamEl.innerHTML = DOMPurify.sanitize(marked.parse(fullText));
             } catch (e) {
@@ -2612,9 +2694,10 @@ Check your console and the live preview to see if the bundled code functions as 
                 }
                 if (url) {
                     try {
-                        if (this.currentPlayingAudio) { this.currentPlayingAudio.pause(); this.currentPlayingAudio = null; }
+                        if (this.currentPlayingAudio) { this.currentPlayingAudio.pause(); this.currentPlayingContent = null; }
                         const audio = new Audio(url);
                         this.currentPlayingAudio = audio;
+
                         audio.play().catch(err => console.error("Error auto-playing audio:", err));
 
                         audio.onended = () => {
@@ -2636,5 +2719,6 @@ Check your console and the live preview to see if the bundled code functions as 
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new App();
+    // expose app instance for integration modules (dictation, Puter helpers)
+    window.devSparkApp = new App();
 });

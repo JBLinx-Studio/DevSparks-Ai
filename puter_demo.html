@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Puter.js — Quick Demo (Frontend Only)</title>
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;max-width:980px;margin:28px auto;color:#111;padding:18px}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    button{padding:8px 12px;border-radius:6px;border:1px solid #ddd;background:#f6f8fa;cursor:pointer}
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:16px}
+    .card{border:1px solid #e6e6e6;padding:14px;border-radius:8px;background:#fff}
+    label{display:block;font-size:13px;margin-top:8px}
+    input, textarea, select{width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:6px;font-family:inherit}
+    .small{font-size:13px;color:#666}
+    .file-list{max-height:220px;overflow:auto;margin-top:8px;border-radius:6px;background:#fbfbfb;padding:8px}
+    .file-item{display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px dashed #eee}
+    .host-url{word-break:break-all;color:#0b63ff}
+    .log{font-family:monospace;background:#0f1720;color:#dbeafe;padding:8px;border-radius:6px;max-height:160px;overflow:auto}
+    .ai-chat{display:flex;flex-direction:column;gap:8px}
+    .ai-output{min-height:80px;padding:8px;border:1px solid #eee;border-radius:6px;background:#fafafa}
+    .img-preview{max-width:100%;border:1px solid #eee;border-radius:6px;margin-top:8px}
+    .muted{color:#666;font-size:13px}
+  </style>
+  <script src="https://js.puter.com/v2/"></script>
+</head>
+<body>
+  <header>
+    <h1>Puter.js Demo — Frontend Only</h1>
+    <div>
+      <button id="signInBtn">Sign In with Puter</button>
+      <button id="signOutBtn" style="display:none">Sign Out</button>
+    </div>
+  </header>
+
+  <section class="grid">
+    <div>
+      <div class="card" id="userCard">
+        <h3>User</h3>
+        <div id="userInfo"><div class="small">Not signed in.</div></div>
+        <div style="margin-top:10px">
+          <button id="createHelloBtn">Create hello.txt</button>
+          <button id="readHelloBtn">Read hello.txt</button>
+        </div>
+        <div style="margin-top:12px">
+          <label for="kvSelect">Theme preference (KV)</label>
+          <select id="kvSelect"><option value="light">light</option><option value="dark">dark</option></select>
+          <div style="margin-top:8px">
+            <button id="savePrefBtn">Save Preference to KV</button>
+            <button id="loadPrefBtn">Load Preference from KV</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3>Cloud File Storage</h3>
+        <div class="small">Create, list, open and delete text files in your Puter cloud storage.</div>
+        <label for="newFilename">New file name</label>
+        <input id="newFilename" placeholder="notes.txt" value="hello.txt">
+        <label for="newFileContent">Content</label>
+        <textarea id="newFileContent" rows="5">Hello from Puter.js demo!</textarea>
+        <div style="margin-top:8px">
+          <button id="saveFileBtn">Save file</button>
+          <button id="listFilesBtn">List files</button>
+        </div>
+        <div class="file-list" id="fileList"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3>Static Website Hosting</h3>
+        <div class="small">Upload index.html into a folder and host it under a random subdomain (user pays for hosting resources).</div>
+        <label for="hostFolder">Folder name</label>
+        <input id="hostFolder" placeholder="mysite" value="mysite">
+        <label for="indexContent">index.html</label>
+        <textarea id="indexContent" rows="6"><!doctype html><html><body><h1>Hello from Puter hosted site</h1></body></html></textarea>
+        <div style="margin-top:8px">
+          <button id="createHostBtn">Create & Host</button>
+          <button id="deleteHostBtn">Delete Hosted Site</button>
+        </div>
+        <div style="margin-top:8px">Hosted URL: <div id="hostUrl" class="host-url">—</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h3>AI Chat & Image Gen</h3>
+        <div class="small">Uses puter.ai.chat() (GPT-5 nano) and puter.ai.txt2img()</div>
+        <div class="ai-chat">
+          <label for="aiProviderSelect">AI Provider</label>
+          <select id="aiProviderSelect">
+            <option value="websim">Websim AI (Default)</option>
+            <option value="puter">Puter AI (Account)</option>
+          </select>
+          <textarea id="aiInput" rows="3" placeholder="Ask the assistant..."></textarea>
+          <div style="display:flex;gap:8px">
+            <button id="sendChatBtn">Send Chat</button>
+            <button id="streamChatBtn">Send (stream)</button>
+            <button id="genImageBtn">Generate Image</button>
+          </div>
+          <div id="aiOutput" class="ai-output muted">AI output will appear here.</div>
+          <img id="aiImage" class="img-preview" style="display:none" alt="Generated image">
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3>Debug Log (puter.print used extensively)</h3>
+        <div id="debugLog" class="log"></div>
+        <div style="margin-top:8px" class="muted">All actions call puter.print() which writes to this log for demonstration.</div>
+      </div>
+    </div>
+  </section>
+
+  <script type="module" src="puter_demo.js"></script>
+</body>
+</html>

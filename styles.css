@@ -46,6 +46,12 @@
     --file-tree-bg: #f1f3f5; /* slightly darker, cooler paper for file area */
     --file-tree-font-size: 13px; /* more compact font for file tree */
     --file-tree-padding: 8px; /* tighter padding for a denser tree */
+
+    /* @tweakable [background color of the send button] */ --send-btn-bg: var(--color-primary);
+    /* @tweakable [hover background color for send button] */ --send-btn-hover: var(--color-primary-dark);
+    /* @tweakable [height of send button in px] */ --send-btn-height: 44px;
+    /* @tweakable [size of the send icon in px] */ --send-icon-size: 18px;
+    /* @tweakable [strength of send-button glow on hover 0..1] */ --send-btn-glow: 0.16;
 }
 
 * {
@@ -913,126 +919,6 @@ html, body, .sidebar, .chat-messages, .console-output,
     border-color: var(--color-primary);
 }
 
-/* NEW: Styles for images embedded directly in chat messages */
-.message-content img.message-image {
-    max-width: 100%;
-    height: auto;
-    border-radius: 0; /* Square corners */
-    margin-top: var(--spacing-sm); /* Space above the image */
-    margin-bottom: var(--spacing-sm); /* Space below the image */
-    display: block; /* Ensures it takes full width and new line */
-}
-
-/* NEW: Styles for videos embedded directly in chat messages */
-.message-content video.message-video {
-    max-width: 100%;
-    height: auto;
-    border-radius: 0; /* Square corners */
-    margin-top: var(--spacing-sm);
-    margin-bottom: var(--spacing-sm);
-    display: block;
-    background-color: black; /* Ensure black background for video player */
-}
-
-/* NEW: Styles for the "View Full / Save Image" and "View Full / Save Video" buttons in chat messages */
-.view-image-button, .view-video-button {
-    align-self: flex-start; /* Aligns button to the left within the message bubble */
-    margin-top: var(--spacing-sm); /* Space above the button */
-    padding: var(--spacing-xs) var(--spacing-sm);
-    font-size: 12px;
-    background-color: var(--color-bg-light); /* Darker background */
-    color: var(--color-text-dark); /* Light text */
-    border: 1px solid var(--color-border);
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-.view-image-button:hover, .view-video-button:hover {
-    background-color: var(--color-bg-dark);
-    color: var(--color-primary);
-    border-color: var(--color-primary-dark);
-    transform: none; /* No lift for smaller buttons */
-    box-shadow: none;
-}
-
-/* NEW: Container for speaker icon and other actions at the bottom of the message */
-.message-actions { 
-    display: flex;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-sm); /* Space below the text content */
-    align-self: flex-end; /* Default for assistant message (aligns actions to the right within its bubble) */
-}
-
-/* Override message-actions alignment for user messages (aligns actions to the left within its bubble) */
-.message.user .message-actions {
-    align-self: flex-start; 
-}
-
-/* Common styles for the speaker icon and new more actions button */
-.speaker-icon, .more-actions-btn { 
-    background: none;
-    border: none;
-    color: var(--color-text-light); /* Default color for icons */
-    cursor: pointer;
-    padding: var(--spacing-xs);
-    border-radius: 0; /* Square corners */
-    transition: background-color 0.2s ease, color 0.2s ease;
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.speaker-icon svg, .more-actions-btn svg {
-    width: 16px;
-    height: 16px;
-}
-
-.speaker-icon:hover, .more-actions-btn:hover {
-    background-color: var(--color-bg-light); /* Lighter background on hover */
-    color: var(--color-text-dark); /* Darker color on hover */
-}
-
-/* Specific hover for speaker icon to match primary color when speaking or active */
-.speaker-icon:hover {
-    background-color: var(--color-primary-light);
-    color: var(--color-bg-light);
-}
-
-.chat-input {
-    display: flex;
-    padding: var(--spacing-lg) var(--spacing-xl);
-    gap: var(--spacing-md);
-    border-top: 1px solid var(--color-border);
-    flex-shrink: 0;
-    background-color: var(--color-bg-dark);
-    margin-top: 6px; /* ensure chat input doesn't sit flush to bottom by small gap */
-}
-
-.chat-input textarea {
-    flex: 1;
-    padding: var(--spacing-md) var(--spacing-lg);
-    border: 1px solid var(--color-border);
-    border-radius: 0; /* Square corners */
-    resize: none;
-    font-family: inherit;
-    font-size: 14px;
-    outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    min-height: 40px;
-    /* Adjusted max-height for larger chat window */
-    max-height: 200px;
-    overflow-y: auto;
-    background-color: var(--color-bg-light); /* Darker input background */
-    color: var(--color-text-dark);
-}
-
-.chat-input textarea:focus {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(255, 179, 0, 0.25); /* Updated shadow color to new primary */
-}
-
 /* NEW: Editor Panel container styles */
 .editor-panel {
     display: flex;
@@ -1091,81 +977,103 @@ html, body, .sidebar, .chat-messages, .console-output,
     display: flex; /* Shown when active */
 }
 
-.code-header {
-    padding: var(--spacing-md) var(--spacing-xl);
-    border-bottom: 1px solid var(--color-border);
-    display: flex;
-    justify-content: space-between; /* Space out file tabs and code actions */
-    align-items: center;
-    flex-shrink: 0;
-    background-color: var(--color-bg-dark); /* Slightly off-white */
-}
-
-/* Make code-actions compact and right-aligned */
-.code-actions {
-    display: flex;
-    gap: 8px; /* compact spacing */
-    align-items: center;
-    justify-content: flex-end;
-}
-
-/* Ensure preview/sync buttons are small and compact in the header */
-.code-actions .btn {
-    padding: 6px 10px;
-    font-size: 13px;
-}
-
-/* Slight layout tweak so the file-info doesn't overflow the header */
-.file-info {
-    flex: 1 1 auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0; /* allow shrinking when window is narrow */
-}
-
-.current-file-name-display {
-    max-width: 360px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Editor code textarea style improved for IDE feel */
+/* Enhanced editor visuals for better readability and quality */
 .code-editor {
     flex: 1;
     position: relative;
     overflow: hidden;
+    border-left: 1px solid rgba(0,0,0,0.06);
+    background: linear-gradient(180deg,#071124 0%, #071422 100%); /* deep, neutral editor surface */
+    display: flex;
+    flex-direction: column;
 }
 
+/* If Monaco is loaded it will create .monaco-editor inside the editor container */
+.monaco-editor, .monaco-editor .margin, .monaco-editor .monaco-scrollable-element {
+    height: 100% !important;
+    width: 100% !important;
+}
+
+/* Fallback textarea when Monaco isn't available */
 .code-editor textarea {
     width: 100%;
     height: 100%;
-    padding: 24px 28px; /* slightly larger padding for editor feel */
+    padding: 20px 28px;
     border: none;
     outline: none;
     font-family: 'Space Mono', 'Source Code Pro', monospace;
-    font-size: 15px; /* slightly larger for readability */
+    font-size: 14px;
     line-height: 1.6;
-    background: #0b1220; /* deep code editor surface */
+    background: transparent; /* now inherits the deep editor surface */
     color: #e6eef6;
     resize: none;
-    tab-size: 4;
-    -moz-tab-size: 4;
+    tab-size: 2;
+    -moz-tab-size: 2;
     border-radius: 0;
-    box-shadow: 0 10px 24px rgba(2,6,23,0.6);
-    caret-color: #9AE6FF; /* brighter caret for visibility */
-    white-space: pre; /* preserve whitespace */
+    caret-color: #9AE6FF;
+    white-space: pre;
     word-break: normal;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition: box-shadow 0.12s ease, border-color 0.12s ease;
 }
 
-/* subtle focus treatment for a more IDE-like feel */
+/* Focus treatment for fallback textarea */
 .code-editor textarea:focus {
-    box-shadow: 0 14px 32px rgba(2,6,23,0.7), 0 0 0 3px rgba(59,130,246,0.06);
+    box-shadow: 0 18px 36px rgba(2,6,23,0.7), 0 0 0 4px rgba(59,130,246,0.06);
     outline: none;
+}
+
+/* Subtle focused line indicator for Monaco / textarea */
+.code-editor .focused-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 28px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00));
+    pointer-events: none;
+    mix-blend-mode: overlay;
+}
+
+/* Editor toolbar area (compact) */
+.editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00));
+    color: var(--color-text-light);
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+/* Small inline status chips inside editor toolbar */
+.editor-toolbar .status-chip {
+    padding: 4px 8px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.18);
+    color: #e6eef6;
+    border: 1px solid rgba(255,255,255,0.03);
+    font-weight: 600;
+    font-size: 12px;
+}
+
+/* Improve contrast of gutter and minimap if present */
+.monaco-editor .margin, .monaco-editor .glyph-margin {
+    background: linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.02));
+}
+
+/* Improve selection and line highlight colors for Monaco */
+.monaco-editor .view-line::selection,
+.monaco-editor .mtk1::selection,
+.monaco-editor .view-lines ::selection {
+    background: rgba(154,230,255,0.14);
+}
+
+/* Make diff between editor and other panels clearer */
+.code-editor, .console-output {
+    border-left: 1px solid rgba(255,255,255,0.03);
 }
 
 /* Console styling */
@@ -1211,6 +1119,254 @@ html, body, .sidebar, .chat-messages, .console-output,
 
 .console-line.debug {
     color: var(--color-debug-text);
+}
+
+/* NEW: Comments Panel Styles */
+.comments-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg-medium);
+    overflow: hidden;
+    padding: var(--spacing-lg) var(--spacing-xl);
+}
+
+.comment-list {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: var(--spacing-lg); /* Space above input area */
+}
+
+.comment-item {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background-color: var(--color-bg-dark);
+    border-radius: 0;
+    border: 1px solid var(--color-border);
+}
+
+.comment-author-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: var(--spacing-sm);
+    flex-shrink: 0;
+    border: 2px solid var(--color-primary-light);
+}
+
+.comment-content-wrapper {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.comment-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: var(--spacing-xs);
+    font-size: 13px;
+    color: var(--color-text-light);
+}
+
+.comment-author-name {
+    font-weight: 600;
+    color: var(--color-text-dark);
+    margin-right: var(--spacing-sm);
+}
+
+.comment-timestamp {
+    font-size: 11px;
+}
+
+.comment-body {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--color-text-dark);
+    word-wrap: break-word;
+}
+
+/* Markdown rendering within comments */
+.comment-body p:last-child {
+    margin-bottom: 0;
+}
+
+.comment-body img {
+    max-width: 100%;
+    /* Max-height and max-width are now controlled by JS using values from app.js tweakables */
+    height: auto;
+    object-fit: contain;
+    border-radius: 0;
+    margin-top: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    display: block;
+    border: 1px solid var(--color-border);
+}
+
+.comment-input-area {
+    display: flex;
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--color-border);
+    background-color: var(--color-bg-dark); /* Match chat input background */
+    flex-shrink: 0;
+    gap: var(--spacing-md);
+}
+
+.chat-input {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg-dark);
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.chat-input textarea#messageInput {
+    flex: 1;
+    min-height: 44px; /* ensure usable height */
+    max-height: 140px;
+    resize: none;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+    background: var(--color-bg-light);
+    color: var(--color-text-dark);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.4;
+    outline: none;
+}
+
+.chat-input textarea#messageInput:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 4px rgba(59,130,246,0.06);
+}
+
+/* Compact, improved Code Header layout */
+.code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--color-border);
+    background: transparent;
+}
+
+.code-header .file-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0; /* allow shrinking on small screens */
+    flex: 1;
+}
+
+.code-header .file-info label {
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--color-text-dark);
+    margin-right: 8px;
+}
+
+.code-header .file-info .form-select {
+    min-width: 220px;
+    max-width: 420px;
+    flex: 0 1 220px; /* compact but flexible */
+}
+
+.code-header .file-info #currentFileNameDisplay {
+    color: var(--color-text-medium);
+    font-size: 13px;
+    margin-left: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 240px;
+}
+
+/* Compact code action buttons group */
+.code-header .code-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Make header buttons uniform small size and visually aligned with select */
+.code-header .btn {
+    padding: 6px 10px;
+    font-size: 13px;
+    height: 34px;
+    line-height: 1;
+    border-radius: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Secondary buttons slightly lighter than primary but consistent sizing */
+.code-header .btn.btn-secondary {
+    background: var(--color-bg-light);
+    color: var(--color-text-dark);
+    border: 1px solid var(--color-border);
+}
+
+/* Ensure the "Refresh" button visually groups with the select (reduced margin) */
+#refreshEditorScriptsBtn {
+    margin-left: 8px;
+}
+
+/* Make preview/sync buttons compact and consistent */
+.code-header .code-actions .btn {
+    min-width: 88px;
+    padding: 6px 8px;
+}
+
+/* Improved Dictate button appearance and positioning near the chat input */
+#dictateBtn {
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 0;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-light);
+    color: var(--color-text-dark);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+}
+
+/* Make it align visually with send button and textarea */
+.chat-input #dictateBtn {
+    margin-left: 6px;
+    flex-shrink: 0;
+    align-self: center;
+}
+
+/* Slight hover affordance but no rising effect */
+#dictateBtn:hover {
+    background: var(--color-bg-medium);
+    border-color: var(--color-primary);
+}
+
+/* On smaller screens, allow the select to shrink and buttons to wrap neatly */
+@media (max-width: 900px) {
+    .code-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    .code-header .file-info {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    .code-header .code-actions {
+        justify-content: flex-end;
+    }
 }
 
 /* NEW: Comments Panel Styles */
@@ -1544,6 +1700,21 @@ html, body, .sidebar, .chat-messages, .console-output,
     font-weight: 500;
 }
 
+/* Add concise preview limitation note styling */
+.preview-note {
+    font-size: 12px;
+    color: var(--color-text-medium);
+    background: rgba(96,165,250,0.08);
+    border: 1px solid rgba(96,165,250,0.14);
+    padding: 6px 10px;
+    border-radius: 3px;
+    margin-right: 12px;
+    max-width: 40%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
 .github-modal, .options-modal, .custom-modal { /* Combined styles for all modals */
     position: fixed;
     top: 0;
@@ -1629,6 +1800,10 @@ html, body, .sidebar, .chat-messages, .console-output,
     border-bottom: 1px solid var(--color-border);
     font-size: 15px;
     color: var(--color-text-dark);
+}
+
+.setting-item label[for="aiProviderSelect"] {
+    min-width: 120px;
 }
 
 .setting-item:last-child {
@@ -2336,10 +2511,48 @@ html, body, .sidebar, .chat-messages, .console-output,
 .reasonings-panel.collapsed { max-height: 36px; overflow: hidden; }
 .reasonings-panel.collapsed .reasonings-body { display: none; }
 
-/* improve readability of inner-thoughts: subtle italic and faded color for raw chain-of-thought */
-.reasoning-steps .chain-thought {
-    color: rgba(255,255,255,0.9);
-    font-style: italic;
-    font-size: 12px;
-    line-height: 1.25;
+/* Improved, more accessible Send button (chat) */
+#sendBtn {
+    height: var(--send-btn-height);
+    padding: 0 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--send-btn-bg);
+    color: #fff;
+    border: 1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 8px 20px rgba(37,99,235,0.14);
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 14px;
+    border-radius: 0; /* keep square edges */
+    transition: box-shadow 160ms ease, background 120ms ease, transform 120ms ease;
+    align-self: center;
+    outline: none;
 }
+
+/* subtle non-rising hover feedback: glow + scale 0.995 for pressed feel but no rise */
+#sendBtn:hover { background: var(--send-btn-hover); box-shadow: 0 10px 30px rgba(37,99,235,var(--send-btn-glow)); transform: scale(0.999); }
+
+/* pressed state (keyboard/mouse) */
+#sendBtn:active { transform: scale(0.995); box-shadow: 0 6px 14px rgba(37,99,235,0.10); }
+
+/* focus-visible for keyboard users */
+#sendBtn:focus { outline: 3px solid rgba(59,130,246,0.12); outline-offset: 2px; }
+
+/* send button icon sizing and layout helper */
+#sendBtn svg { width: var(--send-icon-size); height: var(--send-icon-size); flex-shrink: 0; fill: currentColor; }
+
+/* NEW: Send-image graphic (small square corner badge inside send button or used elsewhere) */
+.send-image-graphic {
+    display:inline-grid;
+    place-items:center;
+    width: calc(var(--send-btn-height) - 10px);
+    height: calc(var(--send-btn-height) - 10px);
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 0; /* keep sharp */
+    margin-left: 6px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+}
+.send-image-graphic svg { width: 18px; height: 18px; color: rgba(255,255,255,0.95); }

@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  setup-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint || true
+
+      - name: Build (production)
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+  preview-deploy:
+    needs: setup-and-build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Deploy to GitHub Pages (optional)
+        if: env.DEPLOY_GITHUB_PAGES == 'true'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+
+      - name: Deploy to Cloudflare Pages (optional)
+        if: env.DEPLOY_CLOUDFLARE_PAGES == 'true'
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          echo "Uploading dist to Cloudflare Pages is environment-specific."
+          echo "Use Cloudflare API or Wrangler in CI with appropriate secrets."
+
+      - name: Trigger Vercel/Netlify (optional)
+        if: env.DEPLOY_VERCEL == 'true' || env.DEPLOY_NETLIFY == 'true'
+        run: |
+          echo "For Vercel/Netlify, connect the repo in their dashboard and they will run 'npm run build'."

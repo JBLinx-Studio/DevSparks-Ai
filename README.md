@@ -1,73 +1,27 @@
-# Welcome to your Lovable project
+# VisionStack
 
-## Project info
+## Puter Integration & Lovable Compatibility
 
-**URL**: https://lovable.dev/projects/c1ceed4e-cd4d-4951-b55e-8930b5890b39
+This project includes a full in-browser Puter integration intended for Lovable compatibility:
+- Uses the Puter browser SDK when available (https://js.puter.com/v2/).
+- Popup sign-in flow with persistent session (localStorage + sessionStorage).
+- Auto-creates a per-user FS folder (devsparks/{userId}).
+- Provides best-effort fallbacks to localStorage for FS/KV when Puter is unavailable.
+- Exposes diagnostic helpers: window.PuterIntegration.runDiagnostics(), window.PuterService.runDiagnostics(), window.PuterShim.getStorageInfo().
+- UI bindings already present for: Sign In, Storage Info, Connectivity Test, and Tutorials.
 
-## How can I edit this code?
+Quick pointers:
+- Tutorials button in the header opens Puter tutorials: https://developer.puter.com/tutorials/
+- For programmatic access, use the exported integration:
+  - window.lovablePuter (global wrapper)
+  - import puterIntegration from '/src/integrations/puter/puter_integration.ts'
+  - import PuterService from '/puter_services.js'
 
-There are several ways of editing your application.
+Tweakable items:
+- Many integration and UI behaviors are annotated with /* @tweakable */ comments in the source for quick adjustments (timeouts, folder base, UI text).
 
-**Use Lovable**
+Lovable notes:
+- The project uses a Vite setup; it is structured for browser-only deployment and should open/preview in Lovable.
+- Ensure the Puter SDK script (https://js.puter.com/v2/) is allowed by the environment; the integration auto-falls back if blocked.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/c1ceed4e-cd4d-4951-b55e-8930b5890b39) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/c1ceed4e-cd4d-4951-b55e-8930b5890b39) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+See src/integrations/puter/puter_integration.ts and puter_integration.js for implementation details and tweakable parameters.

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Puter Connectivity Diagnostic Widget</title>
+  <link rel="stylesheet" href="" />
+  <style>
+    #puterDiag {
+      position: fixed;
+      right: 12px;
+      bottom: 12px;
+      width: 420px;
+      max-height: 60vh;
+      overflow: auto;
+      background: #0f1724;
+      color: #e6eef6;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: system-ui;
+      cursor: pointer;
+    }
+    #puterDiag h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+    }
+    .pd-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0;
+    }
+    .pd-btn {
+      background: #06b6d4;
+      border: none;
+      color: #000;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .pd-bad {
+      color: #ffb4b4;
+    }
+    .pd-good {
+      color: #b8ffe0;
+    }
+    .pd-log {
+      background: #0b1220;
+      color: #9fd6ff;
+      padding: 8px;
+      border-radius: 6px;
+      margin-top: 8px;
+      font-size: 12px;
+      overflow: auto;
+    }
+    .pd-check {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 13px;
+    }
+    .pd-note {
+      opacity: 0.8;
+      margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Widget markup -->
+  <div id="puterDiag" role="region" aria-label="Puter connectivity diagnostic">
+    <h4>Puter Connectivity Diagnostic</h4>
+    <div id="pdStatus" class="pd-row">
+      <strong>Status:</strong> 
+      <span id="pdState">initializing...</span>
+    </div>
+    <div class="pd-row" style="flex-wrap:wrap;gap:6px;">
+      <button id="pdSignIn" class="pd-btn" title="Open Puter sign-in popup">Sign in to Puter (popup)</button>
+      <button id="pdRetry" class="pd-btn" title="Re-run all connectivity checks">Re-run tests</button>
+      <button id="pdForceLink" class="pd-btn" title="Best-effort: attempt to link external auth">Link external → Puter</button>
+    </div>
+    <div style="margin-top:8px;">
+      <div><strong>Quick checklist — try these first</strong></div>
+      <ul style="font-size:13px;margin:6px 0 0 18px;color:#cfefff">
+        <li>Test in different browser or incognito (extensions can block popups/cookies).</li>
+        <li>Disable ad-blockers/privacy extensions for WebSim domain.</li>
+        <li>Allow third-party cookies and popups for this site.</li>
+        <li>Ensure CSP allows https://js.puter.com and https://*.puter.site.</li>
+        <li>If sign-in completes but UI still shows local, copy widget logs + browser console here.</li>
+      </ul>
+    </div>
+    <div style="margin-top:8px;">
+      <div><strong>Detailed checks:</strong></div>
+      <div id="pdChecks" style="font-size:13px;margin-top:6px"></div>
+    </div>
+    <div style="margin-top:8px;">
+      <div><strong>Actions:</strong></div>
+      <div class="pd-row" style="flex-wrap:wrap;gap:6px;">
+        <button id="pdMigrate" class="pd-btn" title="Migrate local → Puter (scan)">Migrate local → Puter (scan)</button>
+        <button id="pdAItest" class="pd-btn" title="Run a small AI probe">Quick AI test</button>
+        <button id="pdClearKV" class="pd-btn" title="Inspect KV (read-only)">Show KV keys</button>
+      </div>
+    </div>
+    <div style="margin-top:8px;"><strong>Logs</strong>
+      <div id="pdLogs" class="pd-log">Widget initialized. Click "Re-run tests".</div>
+    </div>
+  </div>
+
+  <!-- Widget script (self-contained) -->
+  <script>
+    /* Puter Diagnostic Widget
+       Usage: paste this snippet into your app (near end of <body>) or open this file directly.
+       Exposes window._puterDiagRun() and window._puterDiagLog() for debugging.
+    */
+    (async function() {
+      // Try to attach Puter SDK if not pre-loaded (non-blocking)
+      if (!window.puter && typeof window.Puter !== 'undefined') {
+        window.puter = window.Puter;
+      }
+
+      const pd = {
+        elState: document.getElementById('pdState'),
+        elChecks: document.getElementById('pdChecks'),
+        elLogs: document.getElementById('pdLogs'),
+        btnSignIn: document.getElementById('pdSignIn'),
+        btnRetry: document.getElementById('pdRetry'),
+        btnMigrate: document.getElementById('pdMigrate'),
+        btnAItest: document.getElementById('pdAItest'),
+        btnForceLink: document.getElementById('pdForceLink'),
+        btnShowKV: document.getElementById('pdClearKV'),
+        userFolderBase: 'visionstack_users'
+      };
+
+      function time() { return new Date().toISOString(); }
+      function log(...args) {
+        const line = `${time()}  ${Array.from(args).map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')}`;
+        pd.elLogs.textContent = line + "\n\n" + pd.elLogs.textContent;
+        console.log('[PUTER-DIAG]', ...args);
+      }
+      function setState(msg, ok) {
+        pd.elState.textContent = msg;
+        pd.elState.className = ok ? 'pd-good' : 'pd-bad';
+      }
+      function clearChecks() { pd.elChecks.innerHTML = ''; }
+      function appendCheck(title, ok, note) {
+        const div = document.createElement('div');
+        div.className = 'pd-check';
+        const left = document.createElement('div'); left.textContent = title;
+        const right = document.createElement('div'); right.textContent = ok ? 'OK' : 'FAIL';
+        right.style.color = ok ? '#b8ffe0' : '#ffb4b4';
+        div.appendChild(left);
+        if (note) {
+          const noteEl = document.createElement('div'); noteEl.className='pd-note'; noteEl.textContent = note;
+          div.appendChild(noteEl);
+        }
+        div.appendChild(right);
+        pd.elChecks.appendChild(div);
+      }
+
+      // Safe helpers that tolerate different Puter SDK shapes (websim / Puter)
+      async function safeCall(fn, fallback = null) {
+        try { return await fn(); } catch(e){ return fallback; }
+      }
+
+      async function runTests() {
+        clearChecks();
+        setState('Running tests...', false);
+        log('Starting Puter connectivity test...');
+        try {
+          // SDK presence
+          const sdkLoaded = !!(window.puter || window.Puter || window.PuterService || window.PuterAPI || window.PuterShim || window.Puter);
+          appendCheck('Puter SDK present', sdkLoaded, sdkLoaded ? (window.puter ? 'window.puter' : window.Puter ? 'window.Puter' : 'shim') : 'not found');
+          log('SDK presence:', sdkLoaded);
+
+          if (!sdkLoaded) { setState('Puter SDK not found', false); return; }
+
+          const api = window.puter || window.Puter || window.PuterService || window.PuterAPI || window.PuterShim;
+
+          // auth.isSignedIn / auth.currentUser
+          let signed = false;
+          try {
+            if (api && typeof api.auth?.isSignedIn === 'function') signed = await api.auth.isSignedIn();
+            else if (api && typeof api.auth?.currentUser !== 'undefined') signed = !!api.auth.currentUser;
+            else if (window.PuterShim && window.PuterShim.user) signed = true;
+          } catch(e){ log('isSignedIn error', e); }
+          appendCheck('auth.isSignedIn()', signed);
+          log('isSignedIn ->', signed);
+
+          let user = null;
+          if (signed) {
+            try {
+              if (api && typeof api.auth?.getUser === 'function') user = await api.auth.getUser();
+              else if (api && typeof api.identity?.whoami === 'function') user = await api.identity.whoami();
+              else if (api && api.auth?.currentUser) user = api.auth.currentUser;
+            } catch(e){ log('getUser error', e); appendCheck('auth.getUser() failed', false, String(e)); }
+            appendCheck('auth.getUser()', !!user, user ? (user.username || user.id || JSON.stringify(user)) : 'no user');
+          }
+
+          // FS test - stat/create user folder
+          let fsOk = false;
+          try {
+            const folder = `${pd.userFolderBase}/${(user && (user.id || user.sub || user.username || user.name)) || 'anonymous'}`;
+            if (api && api.fs && typeof api.fs.stat === 'function') {
+              await api.fs.stat(folder).catch(async () =>{ if (typeof api.fs.mkdir === 'function') await api.fs.mkdir(folder); });
+            } else if (api && api.fs && typeof api.fs.mkdir === 'function') {
+              await api.fs.mkdir(folder);
+            } else {
+              throw new Error('fs API not available');
+            }
+            fsOk = true;
+            appendCheck('fs.stat/mkdir user folder', true, folder);
+            window._puter_user_folder = folder;
+          } catch(e){ appendCheck('fs access failed', false, String(e)); log('FS error', e); }
+
+          // KV check (set/get)
+          let kvOk = false;
+          try {
+            if (api && api.kv && typeof api.kv.put === 'function' && typeof api.kv.get === 'function') {
+              const probeKey = `visionstack_probe_${Date.now()}`;
+              await api.kv.put(probeKey, 'ok').catch(() =>{});
+              const v = await api.kv.get(probeKey).catch(() => null);
+              if (v) kvOk = true;
+              appendCheck('kv.put/get', kvOk, kvOk ? String(v).slice(0, 120) : 'no value');
+            } else {
+              appendCheck('kv not available', false);
+            }
+          } catch(e){ appendCheck('kv error', false, String(e)); log('KV error', e); }
+
+          // AI test (small)
+          let aiOk = false;
+          try {
+            if (api && api.ai && typeof api.ai.chat === 'function') {
+              // try structured call for Puter.ai.chat
+              const resp = await api.ai.chat({ model: 'gpt-5-nano', messages: [{ role: 'user', content: 'Connectivity probe: reply OK' }], stream: false });
+              const txt = resp && (typeof resp === 'string' ? resp : (resp?.content || resp?.choices?.[0]?.message?.content || JSON.stringify(resp).slice(0, 200)));
+              aiOk = !!txt;
+              appendCheck('ai.chat probe', aiOk, txt ? String(txt).slice(0, 160) : 'no response');
+            } else {
+              appendCheck('ai.chat not available', false);
+            }
+          } catch(e){ appendCheck('ai probe failed', false, String(e)); log('AI error', e); }
+
+          // Hosting probe (best-effort)
+          try {
+            if (api && api.host && (typeof api.host.list === 'function' || typeof api.host.createSite === 'function')) {
+              // try list or a harmless call
+              let hosts = null;
+              if (typeof api.host.list === 'function') {
+                hosts = await api.host.list().catch(() => null);
+                appendCheck('hosting.list', !!hosts, hosts ? `${hosts.length} sites` : 'none');
+              } else {
+                appendCheck('hosting API present', true);
+              }
+            } else {
+              appendCheck('hosting not available', false);
+            }
+          } catch(e){ appendCheck('hosting error', false, String(e)); log('Hosting error', e); }
+
+          const finalOk = sdkLoaded && (signed) && fsOk && kvOk && aiOk;
+          setState(finalOk ? 'Connected (full)' : (signed ? 'Partial connectivity' : 'Not connected'), finalOk);
+          log('Connectivity test completed. ok=', finalOk);
+        } catch (err){
+          setState('Test failed (see logs)', false);
+          log('runTests fatal', err);
+        }
+      }
+
+      // Sign-in button must be user gesture to allow popup
+      pd.btnSignIn.addEventListener('click', async () => {
+        try {
+          setState('Opening sign-in...', false);
+          log('User initiated sign-in');
+          const api = window.puter || window.Puter || window.PuterService || window.PuterAPI || window.PuterShim;
+          if (!api || !api.auth) { alert('Puter SDK not detected; check console.'); return; }
+          if (typeof api.auth.signIn === 'function') {
+            await api.auth.signIn();
+          } else if (typeof api.auth.login === 'function') {
+            await api.auth.login();
+          } else {
+            // fallback to opening official puter script origin if available
+            const popup = window.open('https://puter.com/action/sign-in?embedded_in_popup=true', '_blank', 'width=900,height=720');
+            if (!popup) alert('Popup blocked — allow popups for this site and try again.');
+          }
+          setTimeout(() => runTests(), 1200);
+        } catch(e){ log('signIn error', e); setState('Sign-in failed', false);}
+      });
+
+      // Run tests trigger
+      pd.btnRetry.addEventListener('click', async () => { await runTests(); });
+
+      // Migrate local → Puter (best-effort, user must confirm prefix)
+      pd.btnMigrate.addEventListener('click', async () => {
+        try {
+          const prefix = prompt('Local storage prefix to migrate (example: project_file: )', 'project_file:');
+          if (!prefix) return alert('Migration cancelled (no prefix).');
+          const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+          if (keys.length === 0) return alert('No keys found with that prefix in localStorage.');
+          const api = window.puter || window.Puter || window.PuterService || window.PuterAPI || window.PuterShim;
+          const folder = window._puter_user_folder || `${pd.userFolderBase}/anonymous`;
+          for (const k of keys) {
+            const filename = k.slice(prefix.length);
+            const content = localStorage.getItem(k);
+            if (api && api.fs && typeof api.fs.write === 'function') {
+              await api.fs.write(`${folder}/${filename}`, content).catch(async () =>{ if (typeof api.fs.writeFile === 'function') await api.fs.writeFile(`${folder}/${filename}`, content); });
+            } else if (api && api.fs && typeof api.fs.writeFile === 'function') {
+              await api.fs.writeFile(`${folder}/${filename}`, content);
+            } else {
+              log('No FS write available for migration; aborting.');
+              alert('Puter FS write not available in this environment.');
+              return;
+            }
+            log('Migrated', filename);
+          }
+          alert(`Migrated ${keys.length} items to ${folder}.`);
+          await runTests();
+        } catch(e){ log('migration error', e); alert('Migration failed (see console)'); }
+      });
+
+      // Quick AI test
+      pd.btnAItest.addEventListener('click', async () => {
+        try {
+          setState('AI probe running...', false);
+          log('User initiated AI test');
+          const api = window.puter || window.Puter || window.PuterService || window.PuterAPI || window.PuterShim;
+          if (!api || !api.ai || typeof api.ai.chat !== 'function') { alert('AI API not available'); return; }
+          let r = null;
+          try { r = await api.ai.chat({ model: 'gpt-5-nano', messages: [{ role:'user', content:'Connectivity probe: reply OK' }], stream:false }); } catch(e){ try { r = await api.ai.chat('Connectivity probe: reply OK'); } catch(e2){ r = e2; } }
+          alert('AI probe result (see logs)'); log('AI probe result', r);
+          await runTests();
+        } catch(e){ log('AI test error', e); setState('AI probe error', false);}
+      });
+
+      // Show KV keys (best-effort)
+      pd.btnShowKV.addEventListener('click', async () => {
+        try {
+          const api = window.puter || window.Puter || window.PuterService || window.PuterAPI || window.PuterShim;
+          if (!api || !api.kv) { alert('KV API not available'); return; }
+          // Not all SDKs provide list; try best-effort
+          if (typeof api.kv.list === 'function') {
+            const keys = await api.kv.list().catch(() => null);
+            log('KV list', keys);
+            alert('KV keys logged to console.');
+          } else {
+            alert('KV list() not supported by this SDK; try inspecting via console or use puter.kv.get(key).');
+          }
+        } catch(e){ log('KV show error', e); alert('KV inspect failed (see console)'); }
+      });
+
+      // Force link helper (best-effort)
+      pd.btnForceLink.addEventListener('click', async () => {
+        alert('This attempts a best-effort external auth link; ensure window.googleUser exists if using Google linking.');
+        try {
+          const api = window.puter || window.Puter || window.PuterService || window.PuterAPI || window.PuterShim;
+          if (!api || !api.kv) return alert('Puter KV not available for linking.');
+          if (!window.googleUser) return alert('No external googleUser detected in window (you must set this in your app).');
+          const g = window.googleUser;
+          const user = api.auth?.currentUser || await (api.auth?.getUser?.() || null);
+          await api.kv.put(`linked_google:${g.id}`, user?.id || 'unknown');
+          alert('Linked (best-effort). Check console.');
+          log('Linked google->puter', { google: g.id, puter: user?.id });
+        } catch(e){ log('
