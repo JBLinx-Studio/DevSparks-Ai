@@ -248,98 +248,6 @@ export class App {
                 statusDiv.className = 'cloud-storage-status disconnected';
             }
         }
-        // Also reflect status in Options > Puter Account section
-        const statusEl = document.getElementById('puterAccountStatus');
-        const detailsEl = document.getElementById('puterAccountDetails');
-        const signInBtn = document.getElementById('puterOptionsSignInBtn');
-        const signOutBtn = document.getElementById('puterOptionsSignOutBtn');
-        if (statusEl) {
-            const sdkAvailable = !!window.Puter;
-            if (!sdkAvailable) {
-                statusEl.textContent = 'Puter: not available in this environment';
-                if (detailsEl) detailsEl.style.display = 'none';
-            } else if (this.puterUser) {
-                statusEl.textContent = 'Puter: Signed in';
-                if (detailsEl) {
-                    detailsEl.style.display = 'block';
-                    detailsEl.textContent = `User: ${this.puterUser.username || this.puterUser.id || 'unknown'}`;
-                }
-            } else {
-                statusEl.textContent = 'Puter: Available (not signed in)';
-                if (detailsEl) detailsEl.style.display = 'none';
-            }
-        }
-        if (signInBtn && signOutBtn) {
-            if (this.puterUser) {
-                signInBtn.style.display = 'none';
-                signOutBtn.style.display = 'inline-flex';
-            } else {
-                signInBtn.style.display = 'inline-flex';
-                signOutBtn.style.display = 'none';
-            }
-        }
-    }
-
-    // Quick actions for Puter
-    async handlePuterSignIn() {
-        try {
-            const before = this.puterUser;
-            if (window.PuterService?.auth?.signIn) {
-                await window.PuterService.auth.signIn();
-            } else if (window.Puter?.auth?.signIn) {
-                await window.Puter.auth.signIn();
-            } else {
-                throw new Error('Puter auth.signIn is not available');
-            }
-            // refresh user
-            this.puterUser = (window.Puter?.auth?.currentUser) || (await window.Puter?.identity?.whoami?.());
-            this.puterEnabled = !!this.puterUser;
-            this.updatePuterStatusUI();
-            this.showTemporaryFeedback('Signed in to Puter', 'success');
-            if (!before && this.puterUser) {
-                // Optionally hydrate from cloud or save current state
-                this.addConsoleMessage('info', 'Puter sign-in complete. Cloud features enabled.');
-            }
-        } catch (e) {
-            this.addConsoleMessage('error', `Puter sign-in failed: ${e?.message || e}`);
-        }
-    }
-
-    async handlePuterSignOut() {
-        try {
-            if (window.PuterService?.auth?.signOut) {
-                await window.PuterService.auth.signOut();
-            } else if (window.Puter?.auth?.signOut) {
-                await window.Puter.auth.signOut();
-            }
-            this.puterUser = null;
-            this.puterEnabled = false;
-            this.updatePuterStatusUI();
-            this.showTemporaryFeedback('Signed out of Puter', 'success');
-        } catch (e) {
-            this.addConsoleMessage('error', `Puter sign-out failed: ${e?.message || e}`);
-        }
-    }
-
-    async showPuterStorageInfo() {
-        try {
-            const usage = (window.PuterService?.fs?.getUsage) ? await window.PuterService.fs.getUsage() : (await window.Puter?.fs?.getUsage?.());
-            const msg = usage ? `Storage used: ${(usage?.used || 0)} / ${(usage?.quota || '?')}` : 'Storage usage not available';
-            this.addConsoleMessage('info', `Puter storage: ${msg}`);
-            this.showTemporaryFeedback(`Puter storage: ${msg}`, 'info');
-        } catch (e) {
-            this.addConsoleMessage('warn', `Could not get Puter storage info: ${e?.message || e}`);
-        }
-    }
-
-    async runPuterDiagnostics() {
-        try {
-            const diag = (window.PuterService?.runDiagnostics) ? await window.PuterService.runDiagnostics() : { ok: !!window.Puter, auth: !!(window.Puter?.auth?.currentUser) };
-            this.addConsoleMessage('info', `Puter diagnostics: ${JSON.stringify(diag)}`);
-            this.showTemporaryFeedback('Puter diagnostics complete (see Console)', 'info');
-        } catch (e) {
-            this.addConsoleMessage('error', `Diagnostics failed: ${e?.message || e}`);
-        }
     }
 
     setupEventListeners() {
@@ -386,15 +294,6 @@ export class App {
 
         document.getElementById('optionsBtn').addEventListener('click', () => this.showOptionsModal());
         document.getElementById('closeOptionsModal').addEventListener('click', () => this.hideOptionsModal());
-
-        // Puter controls: quick buttons in header and sidebar
-        document.getElementById('puterInfoBtn')?.addEventListener('click', () => this.showPuterStorageInfo());
-        document.getElementById('puterTestBtn')?.addEventListener('click', () => this.runPuterDiagnostics());
-        document.getElementById('puterQuickSignInBtn')?.addEventListener('click', () => this.handlePuterSignIn());
-        // Puter controls in Options modal
-        document.getElementById('puterOptionsSignInBtn')?.addEventListener('click', () => this.handlePuterSignIn());
-        document.getElementById('puterOptionsSignOutBtn')?.addEventListener('click', () => this.handlePuterSignOut());
-        document.getElementById('puterOptionsStorageInfoBtn')?.addEventListener('click', () => this.showPuterStorageInfo());
 
         document.getElementById('mainPanelTabs').addEventListener('click', (e) => {
             if (e.target.classList.contains('panel-tab')) {

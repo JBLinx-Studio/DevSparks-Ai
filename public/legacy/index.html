@@ -11,8 +11,6 @@
     <script src="https://js.puter.com/v2/"></script>
     <!-- Puter integration (Lovable-ready UMD/ESM wrapper): ensure compiled JS is loaded before app -->
     <script type="module" src="./puter_integration.js"></script>
-    <!-- PuterService utilities (auth/fs/kv/ai/host) -->
-    <script type="module" src="./puter_services.js"></script>
 
     <script type="importmap">
         {
@@ -93,7 +91,6 @@
                     <h3>Projects</h3>
                     <div style="display:flex;gap:8px;align-items:center;">
                         <div class="cloud-storage-status" id="cloudStorageStatus"></div>
-                        <button class="btn btn-secondary btn-sm" id="puterQuickSignInBtn" title="Sign in to Puter">Sign In</button>
                     </div>
                     <button class="btn btn-primary" id="newProjectBtn">
                         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
