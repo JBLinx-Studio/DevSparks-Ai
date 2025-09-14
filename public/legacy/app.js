@@ -255,7 +255,7 @@ export class App {
                         this.updateAccountInfoUI();
                         
                         // Try to load projects from Puter cloud
-                        await this.loadProjectsFromPuter();
+                        await this.loadProjects();
                     } else {
                         throw new Error('Puter SDK not available');
                     }
