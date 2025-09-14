@@ -10,6 +10,8 @@
     "preview": "vite preview --port 8080"
   },
   "dependencies": {
+    "dompurify": "^3.2.6",
+    "marked": "^16.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
