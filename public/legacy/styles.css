@@ -42,7 +42,7 @@
     
     --shadow-sm: 0 6px 18px rgba(0,0,0,0.12); /* stronger, crisp shadow */
     --shadow-md: 0 14px 30px rgba(0,0,0,0.16);
-    --sidebar-width: 340px; /* increased width for Project Files panel */
+    --sidebar-width: 280px; /* optimized width for better layout balance */
     --file-tree-bg: #f1f3f5; /* slightly darker, cooler paper for file area */
     --file-tree-font-size: 13px; /* more compact font for file tree */
     --file-tree-padding: 8px; /* tighter padding for a denser tree */
@@ -200,27 +200,29 @@ html, body, .sidebar, .chat-messages, .console-output,
 
 .main-content {
     display: grid;
-    /* New grid layout for sidebar | chat-panel | editor-panel */
-    grid-template-columns: var(--sidebar-width) 1fr 1.2fr; /* Wider sidebar to better fit file tree */
+    /* Optimized grid layout for better space utilization */
+    grid-template-columns: 280px 1fr 1.3fr; /* Reduced sidebar width, better proportions */
     flex: 1;
     overflow: hidden;
+    width: 100%;
+    max-width: 100vw;
 }
 
 .sidebar {
-    width: var(--sidebar-width);
-    min-width: var(--sidebar-width); /* Prevent the sidebar from shrinking below the intended width */
-    max-width: var(--sidebar-width); /* Prevent the sidebar from expanding beyond the intended width */
-    background: var(--file-tree-bg); /* distinct, compact shade for the project area */
+    width: 280px;
+    min-width: 280px;
+    max-width: 280px;
+    background: var(--file-tree-bg);
     border-right: 1px solid var(--color-border);
-    padding: calc(var(--spacing-lg)) var(--spacing-md); /* more compact vertical padding */
+    padding: var(--spacing-lg) var(--spacing-sm);
     overflow-y: auto;
     box-shadow: var(--shadow-sm);
     position: relative;
     z-index: 500;
-    height: 100%; /* Ensure it fills its grid cell */
+    height: 100%;
     display: flex;
     flex-direction: column;
-    flex: 0 0 var(--sidebar-width); /* Force fixed width in layout and prevent flexible stretching */
+    flex: 0 0 280px;
 }
 
 .project-section, .github-section {
