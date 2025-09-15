@@ -10,6 +10,13 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src'),
+        'app': resolve(__dirname, 'app.js'),
+        'chatManager': resolve(__dirname, 'chatManager.js'),
+        'githubManager': resolve(__dirname, 'githubManager.js'),
+        'previewManager': resolve(__dirname, 'previewManager.js'),
+        'fileManager': resolve(__dirname, 'fileManager.js'),
+        'buildManager': resolve(__dirname, 'buildManager.js'),
+        'projectManager': resolve(__dirname, 'projectManager.js'),
       },
     },
     plugins: [
