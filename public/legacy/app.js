@@ -188,28 +188,25 @@ export class App {
                 if (user && user.id) {
                     this.puterUser = user;
                     this.puterEnabled = true;
-                    this.addConsoleMessage('success', `Puter.AI cloud storage connected for user: ${this.puterUser.username || this.puterUser.id}. Projects will be saved to the cloud.`);
+                    // Silently connect without showing console message
                 } else {
                     this.puterUser = null;
                     this.puterEnabled = false;
-                    this.addConsoleMessage('info', 'Puter.AI SDK available but not signed in. Click "Cloud Storage" to sign in for free AI models and cloud sync.');
+                    // Only show sign-in popup when needed, not console messages
                 }
             } else if (window.Puter) {
-                // Legacy fallback
-                this.addConsoleMessage('info', 'Puter.AI SDK detected. Attempting to connect to cloud storage...');
+                // Legacy fallback - silently try to connect
                 await Puter.init();
                 try {
                     this.puterUser = await Puter.identity.whoami();
                     if (this.puterUser && this.puterUser.id) {
                         this.puterEnabled = true;
-                        this.addConsoleMessage('success', `Puter.AI cloud storage connected for user: ${this.puterUser.username}. Projects will be saved to the cloud.`);
+                        // Silently connected
                     } else {
                         this.puterEnabled = false;
-                        this.addConsoleMessage('info', 'Puter.AI available but not signed in.');
                     }
                 } catch (identityError) {
                     this.puterEnabled = false;
-                    this.addConsoleMessage('info', 'Puter.AI available but not signed in.');
                 }
             } else {
                 this.addConsoleMessage('info', 'Puter.AI SDK not available. Using local storage only.');
