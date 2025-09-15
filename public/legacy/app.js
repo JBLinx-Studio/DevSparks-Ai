@@ -68,15 +68,18 @@ export class App {
             { id: 'websim', name: 'Websim AI (Default)' }
         ];
 
-        // add Puter provider option so users can select it in Settings (frontend-only if PuterService present)
-        this.availableAIProviders.push({ id: 'puter:default', name: 'Puter AI (Account)' });
-        this.availableAIProviders.push({ id: 'puter:kimmy-k2', name: 'Kimmy K2 (Puter)' });
-        this.availableAIProviders.push({ id: 'puter:gemini-2.5-flash', name: 'Gemini 2.5 Flash (Puter)' });
-        this.availableAIProviders.push({ id: 'websim:gpt5-mini', name: 'gpt5 Mini (Websim)' });
-        this.availableAIProviders.push({ id: 'websim:gpt5-nano', name: 'gpt5 Nano (Websim - default)' });
+        // add comprehensive Puter AI options
+        this.availableAIProviders.push({ id: 'puter:gpt-5', name: 'GPT-5 (Puter.AI - Free)' });
+        this.availableAIProviders.push({ id: 'puter:gpt-4o', name: 'GPT-4o (Puter.AI - Free)' });
+        this.availableAIProviders.push({ id: 'puter:claude-4-sonnet', name: 'Claude 4 Sonnet (Puter.AI - Free)' });
+        this.availableAIProviders.push({ id: 'puter:claude-4-opus', name: 'Claude 4 Opus (Puter.AI - Free)' });
+        this.availableAIProviders.push({ id: 'puter:deepseek-chat', name: 'DeepSeek Chat (Puter.AI - Free)' });
+        this.availableAIProviders.push({ id: 'puter:gemini-2.5-flash', name: 'Gemini 2.5 Flash (Puter.AI - Free)' });
+        this.availableAIProviders.push({ id: 'websim:gpt5-mini', name: 'gpt5 Mini (WebSim)' });
+        this.availableAIProviders.push({ id: 'websim:gpt5-nano', name: 'gpt5 Nano (WebSim)' });
 
-        // Load persisted AI provider selection (fallback to websim:gpt5-nano)
-        this.aiProvider = localStorage.getItem('aiProvider') || 'websim:gpt5-nano';
+        // Load persisted AI provider selection (fallback to Puter's GPT-5)
+        this.aiProvider = localStorage.getItem('aiProvider') || 'puter:gpt-5';
         this.aiApiKey = localStorage.getItem('aiApiKey') || '';
 
         this.notificationSound = new Audio();
@@ -158,6 +161,15 @@ export class App {
     }
 
     async initCurrentUser() {
+        // Add showPuterSignIn method to the class
+        this.showPuterSignIn = () => {
+            if (window.puterSignIn) {
+                window.puterSignIn.show();
+            } else {
+                console.warn('Puter sign-in component not available');
+            }
+        };
+
         try {
             this.currentUser = await window.websim.getCurrentUser();
             this.addConsoleMessage('info', `Websim user detected: ${this.currentUser.username} (ID: ${this.currentUser.id})`);
@@ -170,16 +182,106 @@ export class App {
 
     async initPuterStorage() {
         try {
-            if (window.Puter) {
+            // Check if user is actually signed in to Puter using the new integration
+            if (window.lovablePuter) {
+                const user = await window.lovablePuter.getUser();
+                if (user && user.id) {
+                    this.puterUser = user;
+                    this.puterEnabled = true;
+                    this.addConsoleMessage('success', `Puter.AI cloud storage connected for user: ${this.puterUser.username || this.puterUser.id}. Projects will be saved to the cloud.`);
+                } else {
+                    this.puterUser = null;
+                    this.puterEnabled = false;
+                    this.addConsoleMessage('info', 'Puter.AI SDK available but not signed in. Click "Cloud Storage" to sign in for free AI models and cloud sync.');
+                }
+            } else if (window.Puter) {
+                // Legacy fallback
                 this.addConsoleMessage('info', 'Puter.AI SDK detected. Attempting to connect to cloud storage...');
                 await Puter.init();
-                this.puterUser = await Puter.identity.whoami();
+                try {
+                    this.puterUser = await Puter.identity.whoami();
+                    if (this.puterUser && this.puterUser.id) {
+                        this.puterEnabled = true;
+                        this.addConsoleMessage('success', `Puter.AI cloud storage connected for user: ${this.puterUser.username}. Projects will be saved to the cloud.`);
+                    } else {
+                        this.puterEnabled = false;
+                        this.addConsoleMessage('info', 'Puter.AI available but not signed in.');
+                    }
+                } catch (identityError) {
+                    this.puterEnabled = false;
+                    this.addConsoleMessage('info', 'Puter.AI available but not signed in.');
+                }
+            } else {
+                this.addConsoleMessage('info', 'Puter.AI SDK not available. Using local storage only.');
+            }
+            
+            this.updatePuterStatusUI();
+            this.updateAccountInfoUI();
+
+            // Listen for sign-in events
+            window.addEventListener('puter:signin', (event) => {
+                this.puterUser = event.detail;
                 this.puterEnabled = true;
-                this.addConsoleMessage('success', `Puter.AI cloud storage connected for user: ${this.puterUser.username}. Projects will be saved to the cloud.`);
+                this.addConsoleMessage('success', `Successfully signed in to Puter.AI as ${this.puterUser.username || this.puterUser.id}`);
                 this.updatePuterStatusUI();
                 this.updateAccountInfoUI();
+            });
+            
+            window.addEventListener('puter:signout', () => {
+                this.puterUser = null;
+                this.puterEnabled = false;
+                this.addConsoleMessage('info', 'Signed out of Puter.AI');
+                this.updatePuterStatusUI();
+                this.updateAccountInfoUI();
+            });
 
+            if (this.puterEnabled) {
                 this.addConsoleMessage('info', 'Note: Your DevSpark AI account is automatically linked to your Websim/Puter.AI session. No separate signup/login is required for these platform features.');
+
+                const localStorageProjects = this._loadProjectsFromLocal();
+                let puterProjects = [];
+                try {
+                    puterProjects = await this._loadProjectsFromPuter();
+                    if (puterProjects && puterProjects.length > 0) {
+                        this.projects = [...puterProjects];
+                        this.addConsoleMessage('info', `Loaded ${puterProjects.length} project(s) from Puter.AI cloud storage.`);
+                    } else {
+                        this.projects = localStorageProjects;
+                        if (localStorageProjects && localStorageProjects.length > 0) {
+                            this.addConsoleMessage('info', `Loaded ${localStorageProjects.length} project(s) from local storage. Consider syncing to cloud.`);
+                        }
+                    }
+                } catch (error) {
+                    this.addConsoleMessage('warn', `Failed to load projects from Puter.AI: ${error.message}. Using local storage.`);
+                    this.projects = localStorageProjects;
+                }
+            } else {
+                const localStorageProjects = this._loadProjectsFromLocal();
+                this.projects = localStorageProjects || [];
+                if (this.projects.length > 0) {
+                    this.addConsoleMessage('info', `Loaded ${this.projects.length} project(s) from local storage.`);
+                }
+            }
+
+            if (this.projects.length > 0) {
+                this.addConsoleMessage('info', `Loading project from storage: "${this.projects[0].name}".`);
+                await this.loadProject(this.projects[0]);
+            }
+            this._renderProjectListUI();
+        } catch (error) {
+            this.addConsoleMessage('error', `Failed to initialize Puter storage: ${error.message}`);
+            console.error('Puter storage initialization error:', error);
+            // Fallback to local storage
+            const localStorageProjects = this._loadProjectsFromLocal();
+            this.projects = localStorageProjects || [];
+            if (this.projects.length > 0) {
+                this.addConsoleMessage('info', `Loading project from local storage: "${this.projects[0].name}".`);
+                await this.loadProject(this.projects[0]);
+            }
+            this._renderProjectListUI();
+        }
+        this.updatePuterStatusUI();
+    }
 
                 const localStorageProjects = this._loadProjectsFromLocal();
                 let puterProjects = [];
@@ -238,14 +340,16 @@ export class App {
     updatePuterStatusUI() {
         const statusDiv = document.getElementById('cloudStorageStatus');
         if (statusDiv) {
-            // Treat PuterShim initialization as "connected" for UI (avoids persistent Local warning)
-            const puterAvailable = this.puterEnabled || (window.PuterShim && window.PuterShim.isInitialized);
-            if (puterAvailable) {
-                statusDiv.textContent = `Cloud Storage: Connected (Puter.AI${this.puterUser ? ` - ${this.puterUser.username}` : ''})`;
+            // Only show connected if actually signed in to Puter
+            const isSignedIn = this.puterUser && this.puterUser.id;
+            if (isSignedIn) {
+                statusDiv.textContent = `Cloud Storage: Connected (Puter.AI - ${this.puterUser.username || this.puterUser.id})`;
                 statusDiv.className = 'cloud-storage-status connected';
             } else {
-                statusDiv.textContent = 'Cloud Storage: Local (Puter.AI not connected)';
+                statusDiv.textContent = 'Cloud Storage: Local (Click to sign in to Puter.AI)';
                 statusDiv.className = 'cloud-storage-status disconnected';
+                statusDiv.style.cursor = 'pointer';
+                statusDiv.onclick = () => this.showPuterSignIn();
             }
         }
     }
