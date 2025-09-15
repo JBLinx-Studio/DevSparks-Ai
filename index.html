@@ -11,6 +11,9 @@
     <!-- Puter quick initializer: auto-check sign-in, show click-to-sign-in banner, expose testing helpers -->
     <script type="module" src="puter-init.js"></script>
 
+    <!-- Monaco loader (AMD) for the in-browser Monaco Editor -->
+    <script src="https://unpkg.com/monaco-editor@0.39.0/min/vs/loader.js"></script>
+    
     <script type="importmap">
         {
             "imports": {
@@ -26,8 +29,6 @@
             }
         }
     </script>
-    <!-- Monaco loader (AMD) for the in-browser Monaco Editor -->
-    <script src="https://unpkg.com/monaco-editor@0.39.0/min/vs/loader.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -529,14 +530,8 @@
     </script>
 
     <script type="module">
-      import React from "https://esm.sh/react@18";
-      import { createRoot } from "https://esm.sh/react-dom@18/client";
-      import PuterDemo from "/src/pages/puter_demo.tsx";
-
-      const mount = document.createElement('div');
-      mount.id = 'puter-demo-mount';
-      document.body.appendChild(mount);
-      createRoot(mount).render(React.createElement(PuterDemo));
+      // Optional: Initialize any demo components if needed
+      console.log('VisionStack initialized');
     </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
-import { ChatManager } from "chatManager";
-import { GitHubManager } from "githubManager";
-import { PreviewManager } from "previewManager";
+import { ChatManager } from "./chatManager.js";
+import { GitHubManager } from "./githubManager.js";
+import { PreviewManager } from "./previewManager.js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 
