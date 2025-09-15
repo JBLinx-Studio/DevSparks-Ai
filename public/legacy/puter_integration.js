@@ -3,7 +3,8 @@
 
 (async () => {
   try {
-    const sdk = window.Puter || {};
+    const sdk = window.Puter || window.puter || {};
+    try { if (!window.Puter && window.puter) window.Puter = window.puter; } catch {}
     const api = {
       async signIn() {
         if (sdk?.auth?.signIn) {

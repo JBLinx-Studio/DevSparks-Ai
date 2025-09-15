@@ -33,10 +33,12 @@ class PuterIntegration {
   // wait for Puter SDK script to attach to window
   private async waitForSDK(timeout = SDK_WAIT_MS) {
     const start = Date.now();
-    while ((window as any).Puter === undefined && Date.now() - start < timeout) {
+    while (!((window as any).Puter || (window as any).puter) && Date.now() - start < timeout) {
       await this.sleep(150);
     }
-    return !!(window as any).Puter;
+    // normalize SDK global (some versions expose `window.puter` lowercase)
+    try { if (!(window as any).Puter && (window as any).puter) { (window as any).Puter = (window as any).puter; } } catch {}
+    return !!((window as any).Puter || (window as any).puter);
   }
 
   // background initialization: prefer real SDK, otherwise create safe shim so app won't crash
@@ -45,10 +47,13 @@ class PuterIntegration {
     const present = await this.waitForSDK();
     if (!present) {
       // create minimal shim so other code won't throw (no network behavior)
-      (window as any).Puter = (window as any).Puter || { auth: {}, fs: {}, kv: {}, ai: {}, host: {} };
+      (window as any).Puter = (window as any).Puter || (window as any).puter || { auth: {}, fs: {}, kv: {}, ai: {}, host: {} };
       this.initialized = true;
       return;
     }
+
+    // ensure alias if SDK exposed as lowercase
+    try { if (!(window as any).Puter && (window as any).puter) { (window as any).Puter = (window as any).puter; } } catch {}
 
     // if SDK present, call init() if provided
     try {

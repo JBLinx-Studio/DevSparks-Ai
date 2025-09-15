@@ -3,6 +3,8 @@
 // initializes a user folder, writes a last-login KV entry, and exposes testing/migration helpers.
 
 (async function puterInit() {
+  // normalize Puter global (SDK may expose lowercase `puter`)
+  if (!window.Puter && window.puter) window.Puter = window.puter;
   const PUTER = window.Puter || window.PuterService || window.PuterShim || null;
   // create visible status element
   let statusEl = document.getElementById('puter-status');
