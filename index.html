@@ -1,14 +1,542 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>VisionStack – Web IDE Preview</title>
-    <meta name="description" content="VisionStack web IDE with live legacy preview and optional Puter.AI integration." />
-    <link rel="canonical" href="/" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionStack</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Puter.js SDK (required by Puter integration) -->
+    <script src="https://js.puter.com/v2/"></script>
+    <!-- Puter quick initializer: auto-check sign-in, show click-to-sign-in banner, expose testing helpers -->
+    <script type="module" src="puter-init.js"></script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "app": "./app.js",
+                "chatManager": "./chatManager.js",
+                "githubManager": "./githubManager.js",
+                "previewManager": "./previewManager.js",
+                "react-dom/client": "https://esm.sh/react-dom@18/client",
+                "marked": "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js",
+                "dompurify": "https://cdn.jsdelivr.net/npm/dompurify/dist/purify.es.min.js",
+                "react": "https://esm.sh/react@18",
+                "react-dom": "https://esm.sh/react-dom@18"
+            }
+        }
+    </script>
+    <!-- Monaco loader (AMD) for the in-browser Monaco Editor -->
+    <script src="https://unpkg.com/monaco-editor@0.39.0/min/vs/loader.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">VisionStack</h1>
+                <!-- AI model selector (moved into header) -->
+                <div id="ai-model-selector" style="position:relative;display:flex;align-items:center;gap:8px;font-family:Inter,system-ui;">
+                  <span style="font-size:13px;color:var(--color-text-dark);font-weight:600;">AI</span>
+                  <button id="ai-model-badge" class="btn btn-secondary btn-sm" aria-haspopup="listbox" aria-expanded="false" style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;min-width:220px;justify-content:space-between;">
+                    <span id="ai-model-badge-label" style="font-weight:600;display:inline-flex;align-items:center;gap:8px;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+                      Select model…
+                    </span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                  </button>
+
+                  <!-- dropdown menu (initially hidden) -->
+                  <div id="ai-model-menu" role="listbox" aria-label="AI model list" style="display:none;position:absolute;top:46px;left:0;min-width:260px;background:var(--color-bg-light);border:1px solid var(--color-border);box-shadow:var(--shadow-md);z-index:10000;padding:6px 6px;flex-direction:column;">
+                    <!-- populated by script -->
+                  </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="optionsBtn">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.17.311a1.464 1.464 0 0 1 .872 2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.17a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2 0 1 0 0-5.86 2.929 2 0 0 0 0 5.86z"/>
+                        </svg>
+                        Options
+                    </button>
+                    <!-- Quick link to Puter tutorials -->
+                    <button class="btn btn-secondary" id="puterTutorialsBtn" title="Puter Tutorials">
+                        Puter Tutorials
+                    </button>
+                    <button class="btn btn-secondary" id="githubBtn">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/>
+                        </svg>
+                        Connect GitHub
+                    </button>
+                    <!-- NEW: quick Puter info button (opens storage info modal) -->
+                    <button class="btn btn-secondary btn-sm" id="puterInfoBtn" title="Puter: Show Storage Info">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2 2"/></svg>
+                    </button>
+                    <!-- NEW: Puter Test button (runs quick connectivity checks) -->
+                    <button class="btn btn-secondary btn-sm" id="puterTestBtn" title="Puter: Run Connectivity Test">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><path d="M12 16v6"/><path d="M4 12h6"/><path d="M14 12h6"/></svg>
+                    </button>
+                    <!-- New: lightweight checkpoint button to create a local snapshot of current project -->
+                    <button class="btn btn-secondary" id="checkpointBtn" title="Create Checkpoint">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10v6a2 2 0 0 1-2 2H7"></path><path d="M3 10v-2a2 2 0 0 1 2-2h6"></path><path d="M12 3v9"></path></svg>
+                        Checkpoint
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <aside class="sidebar">
+                <div class="project-section">
+                    <h3>Projects</h3>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <div class="cloud-storage-status" id="cloudStorageStatus"></div>
+                    </div>
+                    <button class="btn btn-primary" id="newProjectBtn">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/>
+                        </svg>
+                        New Project
+                    </button>
+                    <div class="project-list" id="projectList">
+                    </div>
+                </div>
+                
+                <div class="project-files-section">
+                    <h3>Project Files</h3>
+                    <button class="btn btn-primary btn-sm" id="addFileBtnSidebar">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-earmark-plus" viewBox="0 0 16 16">
+                            <path d="M8 4.466V.534l2.707 2.707-.707.707L8 4.466z"/>
+                        </svg>
+                        Add File
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="uploadFileBtnSidebar">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-upload" viewBox="0 0 16 16">
+                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/>
+                        </svg>
+                        Upload File
+                    </button>
+                    <div class="file-tree-container" id="fileTreeContainer">
+                    </div>
+                </div>
+
+                <div class="github-section" id="githubSection" style="display: none;">
+                    <h3>GitHub</h3>
+                    <div class="github-status" id="githubStatus"></div>
+                    <div class="repo-list" id="repoList">
+                    </div>
+                </div>
+            </aside>
+
+            <div class="chat-panel"> 
+                <div class="chat-section">
+                    <div class="chat-header">
+                        <h3>AI Assistant</h3>
+                        <div class="project-title" id="projectTitle">Untitled Project</div>
+                    </div>
+                    <div class="chat-messages" id="chatMessages">
+                    </div>
+                    <!-- Compact AI Inner-Thoughts Panel (moved directly above input) -->
+                    <div class="reasonings-panel compact" id="reasoningsPanel" aria-live="polite" role="region" aria-label="AI reasoning">
+                        <div class="reasonings-header">
+                            <div class="reasonings-title">AI Thoughts</div>
+                            <div class="reasonings-controls">
+                                <select id="reasoningModeSelect" class="form-select" aria-label="Response mode">
+                                    <option value="casual">Casual</option>
+                                    <option value="analytical">Analytical</option>
+                                    <option value="creative">Creative</option>
+                                    <option value="professional">Professional</option>
+                                    <option value="educational">Educational</option>
+                                    <option value="raw">Raw / Debug</option>
+                                </select>
+                                <button class="btn btn-secondary btn-sm" id="toggleReasoningBtn" title="Collapse/Expand reasoning">▾</button>
+                            </div>
+                        </div>
+                        <div class="reasonings-body" id="reasoningsBody">
+                            <div class="thinking" id="reasoningThinking" style="display:none;">
+                                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                            </div>
+                            <div class="reasoning-steps" id="reasoningSteps">
+                                <div class="reasoning-placeholder" style="color:var(--color-text-medium);">AI inner thoughts will stream here when the assistant is processing — concise, compact, and more "chain-of-thought" style.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- /Compact Reasonings Panel -->
+                    <div class="chat-input">
+                        <textarea id="messageInput" placeholder="Describe what you want to build..."></textarea>
+                        <button class="btn btn-primary" id="sendBtn">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="m12.14 8.753-5.482 4.796c-.646.566-1.658.106-1.658-.753l-.1-.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.17.311a1.464 1.464 0 0 1 .872 2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.17a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 4.466V.534l2.707 2.707-.707.707L8 4.466z"/>
+                            </svg>
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="dictateBtn" title="Dictate (say 'Dictate' to start)">
+                            🎤 Dictate
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="editor-panel"> 
+                <div class="editor-console-panel"> 
+                    <div class="panel-header-tabs" id="mainPanelTabs">
+                        <div class="panel-tab active" data-panel="code">Code Editor</div>
+                        <div class="panel-tab" data-panel="console">Console</div>
+                        <div class="panel-tab" data-panel="internalScripts">Internal Scripts</div> 
+                        <div class="panel-tab" data-panel="deploy">Deployment</div> 
+                    </div>
+
+                    <div class="panel-content active" id="codePanelContent">
+                        <div class="code-header">
+                            <div class="file-info">
+                                <label for="editorScriptSelect" style="font-weight:600;color:var(--color-text-dark);margin-right:12px;">Scripts</label>
+                                <select id="editorScriptSelect" class="form-select" style="min-width:220px;"></select>
+                                <button id="refreshEditorScriptsBtn" class="btn btn-secondary btn-sm" title="Refresh list">Refresh</button>
+                                <span class="current-file-name-display" id="currentFileNameDisplay" style="margin-left:12px;"></span>
+                            </div>
+                            <div class="code-actions">
+                                <button class="btn btn-secondary" id="previewBtn">Preview</button>
+                                <button class="btn btn-primary" id="buildPreviewBtn" title="Build & Preview" style="display:none;">Build & Preview</button>
+                                <button class="btn btn-secondary" id="syncBtn" style="display: none;">Sync to GitHub</button>
+                            </div>
+                        </div>
+                        <div class="code-editor" id="codeEditor">
+                            <textarea id="codeTextarea" placeholder="Your code will appear here..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="panel-content" id="consolePanelContent">
+                        <div class="code-header" style="border-bottom:0;padding:var(--spacing-md) var(--spacing-xl);">
+                            <div class="file-info">
+                                <label for="consoleScriptSelect" style="font-weight:600;color:var(--color-text-dark);margin-right:12px;">Console Targets</label>
+                                <select id="consoleScriptSelect" class="form-select" style="min-width:240px;"></select>
+                                <button id="refreshConsoleTargetsBtn" class="btn btn-secondary btn-sm" title="Refresh list">Refresh</button>
+                            </div>
+                            <div class="code-actions">
+                                <button class="btn btn-secondary" id="clearConsoleBtn">Clear</button>
+                                <button class="btn btn-secondary" id="exportConsoleBtn">Export</button>
+                            </div>
+                        </div>
+                        <div class="console-output" id="consoleOutput">
+                            <div class="console-line log">Welcome to the console!</div>
+                        </div>
+                    </div>
+
+                    <div class="panel-content" id="devLogPanelContent">
+                        <div class="devlog-section">
+                            <h4>DevSpark AI Internal Scripts</h4>
+                            <p style="color: var(--color-text-medium); margin-bottom: var(--spacing-lg);">
+                                Below are the internal scripts and source code that power DevSpark AI. This is provided for transparency and debugging purposes.
+                            </p>
+                            <div id="devLogContent">
+                                <!-- Scripts will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-content" id="deployPanelContent">
+                        <div class="deploy-section">
+                            <h4>Deployment Information</h4>
+                            <div class="deploy-info">
+                                <p><strong>Project Name:</strong> <span id="deployProjectName">-</span></p>
+                                <p><strong>Build Status:</strong> <span id="buildStatus">Not built</span></p>
+                                <button class="btn btn-primary" id="deployBtn">Deploy to GitHub Pages</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comments panel removed (deprecated). Reserved area for future Integrations/Services panel. -->
+                </div>
+            </div>
+        </main>
+
+        <div class="preview-modal" id="previewModal">
+            <div class="preview-content">
+                <div class="preview-header">
+                    <h3>Preview</h3>
+                    <div class="preview-note" id="previewNote" title="Preview limitations">
+                        Note: DevSpark now includes an in-app compilation API (esbuild-wasm) for .ts/.tsx/.jsx and many other inputs.
+                        Use the Preview button to bundle sources for a sandboxed iframe. See <a href="/docs/BUILD.md" style="color:var(--color-primary-light); text-decoration: underline;">Build docs</a> for details.
+                    </div>
+                    <div class="preview-actions"> 
+                        <button class="btn btn-secondary btn-sm" id="refreshPreviewBtn" title="Refresh Preview">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+                                <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534l2.707 2.707-.707.707L8 4.466z"/>
+                            </svg>
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="openNewWindowBtn" title="Open in New Window">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/>
+                            </svg>
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="fullscreenPreviewBtn" title="Toggle Fullscreen">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 4.466V.534l2.707 2.707-.707.707L8 4.466z"/>
+                            </svg>
+                        </button>
+                        <button class="btn btn-primary btn-sm" id="buildCompileBtn" title="Build & Compile">Build & Compile</button>
+                        <div class="preview-mode-buttons">
+                            <button class="btn btn-secondary btn-sm active" id="desktopPreviewBtn" data-mode="desktop" title="Desktop View">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a.5.5 0 0 0 .5.5h12a.5.5 0 0 0 .5-.5v-2.5a.5.5 0 0 1-1 0v2.5A1.5 1.5 0 0 1 14.5 14h-12A1.5 1.5 0 0 1 0 12.5v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                    <path d="M8 4.466V.534l2.707 2.707-.707.707L8 4.466z"/>
+                                </svg>
+                                Desktop
+                            </button>
+                            <button class="btn btn-secondary btn-sm" id="tabletPreviewBtn" data-mode="tablet" title="Tablet View">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a.5.5 0 0 0 .5.5h12a.5.5 0 0 0 .5-.5v-2.5a.5.5 0 0 1-1 0v2.5A1.5 1.5 0 0 1 14.5 14h-12A1.5 1.5 0 0 1 0 12.5v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                    <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V10.5a.5.5 0 0 1-1 0V2.707L4.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                                </svg>
+                                Tablet
+                            </button>
+                            <button class="btn btn-secondary btn-sm" id="mobilePreviewBtn" data-mode="mobile" title="Mobile View">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a.5.5 0 0 0 .5.5h12a.5.5 0 0 0 .5-.5v-2.5a.5.5 0 0 1-1 0v2.5A1.5 1.5 0 0 1 14.5 14h-12A1.5 1.5 0 0 1 0 12.5v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                    <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V10.5a.5.5 0 0 1-1 0V2.707L4.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                                </svg>
+                                Mobile
+                            </button>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" id="closePreviewBtn">×</button>
+                </div>
+                <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+                <div class="preview-loading-overlay" id="previewLoadingOverlay">
+                    <div class="loading-spinner">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534l2.707 2.707-.707.707L8 4.466z"/>
+                        </svg>
+                    </div>
+                    <div class="loading-text">Loading preview...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="github-modal" id="githubModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Connect GitHub</h3>
+                    <button class="btn btn-secondary" id="closeGithubModal">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="github-auth" id="githubAuth">
+                        <p>Connect your GitHub account to sync projects with repositories.</p>
+                        <input type="text" id="githubToken" placeholder="GitHub Personal Access Token">
+                        <button class="btn btn-primary" id="connectGithubBtn">Connect</button>
+                    </div>
+                    <div class="github-orgs" id="githubOrgs" style="display: none;">
+                        <h4>Select Organization</h4>
+                        <div class="org-list" id="orgList"></div>
+                        <button class="btn btn-secondary btn-sm" id="enterOrgManuallyBtn" style="margin-top: var(--spacing-md);">Enter Organization Manually</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="options-modal" id="optionsModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Settings</h3>
+                    <button class="btn btn-secondary" id="closeOptionsModal">×</button>
+                </div>
+                <div class="modal-body">
+                    <h4>AI Assistant Settings</h4>
+                    <div class="setting-item">
+                        <label for="speechToggle">Enable Speech Output</label>
+                        <label class="speech-toggle">
+                            <input type="checkbox" id="speechToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label for="voiceSelect">Select Voice</label>
+                        <select id="voiceSelect" class="form-select"></select>
+                    </div>
+                    <hr style="border-top: 1px solid var(--color-border); margin: var(--spacing-lg) 0;">
+                    <h4>AI Provider Settings</h4>
+                    <p style="font-size: 0.9em; color: var(--color-text-medium); margin-bottom: var(--spacing-sm);">
+                        Websim AI is the default, free AI provided by the DevSpark AI platform itself, requiring no API key.
+                    </p>
+                    <div class="setting-item">
+                        <label for="aiProviderSelect">AI Provider</label>
+                        <select id="aiProviderSelect" class="form-select"></select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="aiApiKeyInput">API Key (Optional)</label>
+                        <input type="password" id="aiApiKeyInput" placeholder="Enter API Key">
+                    </div>
+                    <hr style="border-top: 1px solid var(--color-border); margin: var(--spacing-lg) 0;">
+                    <h4>Account Information</h4>
+                    <div class="account-info-section">
+                        <div class="account-info-details">
+                            <img id="userAvatar" src="" alt="User Avatar" class="user-avatar" style="display:none;">
+                            <p><strong>Username:</strong> <span id="usernameDisplay">Not available</span></p>
+                            <p><strong>User ID:</strong> <span id="userIdDisplay">Not available</span></p>
+                        </div>
+                        <p style="font-size: 0.9em; color: var(--color-text-medium); margin-top: var(--spacing-sm);">
+                            Your DevSpark AI account is linked to your Websim/Puter.AI session. No separate login is required here.
+                        </p>
+                        <button class="btn btn-secondary" id="clearUserDataBtn" style="margin-top: var(--spacing-lg);">Clear Local Data & Reset App</button>
+                    </div>
+                    <!-- NEW: Puter Account Section -->
+                    <hr style="border-top: 1px solid var(--color-border); margin: var(--spacing-lg) 0;">
+                    <h4>Puter Account</h4>
+                    <div id="puterAccountSection" style="display:flex;flex-direction:column;gap:8px;">
+                        <div id="puterAccountStatus" style="font-size:13px;color:var(--color-text-medium);">Puter: initializing...</div>
+                        <div style="display:flex;gap:8px;">
+                            <button id="puterOptionsSignInBtn" class="btn btn-primary">Sign In to Puter</button>
+                            <button id="puterOptionsSignOutBtn" class="btn btn-secondary" style="display:none;">Sign Out</button>
+                            <button id="puterOptionsStorageInfoBtn" class="btn btn-secondary">Show Storage Info</button>
+                        </div>
+                        <div id="puterAccountDetails" style="font-size:13px;color:var(--color-text-medium);display:none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="custom-modal" id="customPromptModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="customPromptTitle"></h3>
+                    <button class="btn btn-secondary close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="customPromptMessage"></p>
+                    <input type="text" id="customPromptInput">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="customPromptCancelBtn">Cancel</button>
+                    <button class="btn btn-primary" id="customPromptOkBtn">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="custom-modal" id="customConfirmModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="customConfirmTitle"></h3>
+                    <button class="btn btn-secondary close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="customConfirmMessage"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="customConfirmCancelBtn">No</button>
+                    <button class="btn btn-primary" id="customConfirmOkBtn">Yes</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Image Preview Overlay -->
+    <div class="image-preview-overlay" id="imagePreviewOverlay" style="display: none;">
+        <div class="image-preview-content">
+            <button class="close-btn" id="closeImagePreviewBtn">&times;</button>
+            <img src="" alt="Generated Image Preview" id="imagePreview" style="display: none;">
+            <div class="image-preview-loading" id="imagePreviewLoading">
+                <div class="loading-spinner">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534l2.707 2.707-.707.707L8 4.466z"/>
+                    </svg>
+                </div>
+                <div class="loading-text">Loading image...</div>
+            </div>
+            <button class="btn btn-primary save-image-btn" id="saveImageBtn" style="display: none;">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a.5.5 0 0 0 .5.5h12a.5.5 0 0 0 .5-.5v-2.5a.5.5 0 0 1-1 0v2.5A1.5 1.5 0 0 1 14.5 14h-12A1.5 1.5 0 0 1 0 12.5v-2.5a.5.5 0 0 1 .5-.5z"/>
+                    <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V10.5a.5.5 0 0 1-1 0V2.707L4.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                </svg>
+                Save Image
+            </button>
+        </div>
+    </div>
+
+    <!-- Video Preview Overlay -->
+    <div class="video-preview-overlay" id="videoPreviewOverlay" style="display: none;">
+        <div class="video-preview-content">
+            <button class="close-btn" id="closeVideoPreviewBtn">&times;</button>
+            <video src="" controls loop autoplay muted playsinline id="videoPreview" style="display: none;"></video>
+            <div class="video-preview-loading" id="videoPreviewLoading">
+                <div class="loading-spinner">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534l2.707 2.707-.707.707L8 4.466z"/>
+                    </svg>
+                </div>
+                <div class="loading-text">Loading video...</div>
+            </div>
+            <button class="btn btn-primary save-video-btn" id="saveVideoBtn" style="display: none;">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a.5.5 0 0 0 .5.5h12a.5.5 0 0 0 .5-.5v-2.5a.5.5 0 0 1-1 0v2.5A1.5 1.5 0 0 1 14.5 14h-12A1.5 1.5 0 0 1 0 12.5v-2.5a.5.5 0 0 1 .5-.5z"/>
+                    <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V10.5a.5.5 0 0 1-1 0V2.707L4.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                </svg>
+                Save Video
+            </button>
+        </div>
+    </div>
+
+    <!-- Mount point for React + LegacyHost which will safely mount legacy scripts inside a React component -->
+    <div id="legacy-host-root" style="display:none;"></div>
+
+    <!-- Load the LegacyHost that mounts legacy non-React scripts inside a controlled React component -->
+    <script type="module">
+        import React from "react";
+        import { createRoot } from "react-dom/client";
+        import LegacyHost from "./legacyHost.jsx";
+
+        const rootEl = document.getElementById('legacy-host-root');
+        if (rootEl) {
+            const root = createRoot(rootEl);
+            root.render(React.createElement(LegacyHost, {}));
+        } else {
+            console.warn('LegacyHost mount point not found.');
+        }
+    </script>
+
+    <!-- Core modules -->
+    <script type="module" src="fileManager.js"></script>
+    <script type="module" src="projectManager.js"></script>
+    <script type="module" src="buildManager.js"></script>
+    <script type="module" src="previewManager.js"></script>
+    <script type="module" src="githubManager.js"></script>
+    <script type="module" src="chatManager.js"></script>
+    <!-- Puter integration must be available before app initializes -->
+    <script type="module" src="puter_integration.js"></script>
+    <script type="module" src="puter_services.js"></script>
+    <script type="module" src="puter_dictation.js"></script>
+    <script type="module" src="app.js"></script>
+
+    <!-- Load the enhanced AI model selector (replaces inline aiModelMenu) -->
+    <script type="module" src="./puter_ai_selector.js"></script>
+
+    <script>
+    // Open Puter tutorials in a new tab
+    document.addEventListener('DOMContentLoaded', () => {
+      const tutBtn = document.getElementById('puterTutorialsBtn');
+      if (tutBtn) tutBtn.addEventListener('click', () => window.open('https://developer.puter.com/tutorials/', '_blank'));
+    });
+    </script>
+
+    <!-- Add Lovable-friendly import maps and prefer ES modules (no other changes) -->
+    <script type="module">
+      // Ensure the new TypeScript-built integration is loaded (Vite will map /src)
+      import puter from '/src/integrations/puter/puter_integration.ts';
+      // Expose a simple helper for the UI
+      window.lovablePuter = puter;
+      // Refresh UI badge if present
+      document.addEventListener('DOMContentLoaded', () => {
+        try { document.getElementById('puterInfoBtn')?.addEventListener('click', () => puter.runDiagnostics().then(r => console.info('Puter diagnostics', r))); } catch(e) {}
+      });
+    </script>
+
+    <script type="module">
+      import React from "https://esm.sh/react@18";
+      import { createRoot } from "https://esm.sh/react-dom@18/client";
+      import PuterDemo from "/src/pages/puter_demo.tsx";
+
+      const mount = document.createElement('div');
+      mount.id = 'puter-demo-mount';
+      document.body.appendChild(mount);
+      createRoot(mount).render(React.createElement(PuterDemo));
+    </script>
+</body>
 </html>
