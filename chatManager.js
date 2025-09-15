@@ -375,19 +375,7 @@ export class ChatManager {
             } catch (jsonError) {
                 // Try to salvage JSON from within raw
                 const fallbackResponse = this.extractFallbackResponse(raw);
-                if (fallbackResponse) {
-                    parsedResponse = fallbackResponse;
-                } else {
-                    // Treat provider output as plain assistant text
-                    parsedResponse = { message: raw || "I'm connected and ready.", files: {} };
-                }
-            }
-                } else {
-                    parsedResponse = {
-                        message: "I apologize, but I encountered an issue with my response format. Please try again or rephrase your request.",
-                        files: {}
-                    };
-                }
+                parsedResponse = fallbackResponse || { message: raw || "I'm connected and ready.", files: {} };
             }
 
             if (typeof parsedResponse.message !== 'string') {

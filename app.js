@@ -612,6 +612,49 @@ export class App {
         if (aiProviderSelect) aiProviderSelect.addEventListener('change', (e) => this.selectAIProvider(e.target.value));
         if (aiApiKeyInput) aiApiKeyInput.addEventListener('input', (e) => this.setAIApiKey(e.target.value));
 
+        // Wire Puter actions in Options modal
+        const puterSignInBtn = document.getElementById('puterOptionsSignInBtn');
+        const puterSignOutBtn = document.getElementById('puterOptionsSignOutBtn');
+        const puterStorageInfoBtn = document.getElementById('puterOptionsStorageInfoBtn');
+        const puterAccountStatus = document.getElementById('puterAccountStatus');
+        const puterAccountDetails = document.getElementById('puterAccountDetails');
+        if (puterSignInBtn) puterSignInBtn.addEventListener('click', async () => {
+            try {
+                await window.PuterShim?.ensureSignedInInteractive?.();
+                this.puterEnabled = !!(window.PuterShim?.user);
+                this.puterUser = window.PuterShim?.user || this.puterUser;
+                this.updatePuterStatusUI();
+                this.updateAIProviderControlsUI();
+                if (puterAccountStatus && this.puterUser) puterAccountStatus.textContent = `Puter: Connected — ${this.puterUser.username || this.puterUser.id}`;
+                if (puterSignOutBtn) puterSignOutBtn.style.display = '';
+                if (puterAccountDetails && this.puterUser) { puterAccountDetails.style.display = 'block'; puterAccountDetails.textContent = JSON.stringify({ whoami: this.puterUser }, null, 2); }
+                // Auto-switch AI to Puter GPT-5
+                this.selectAIProvider('puter:gpt-5');
+            } catch (e) {
+                this.addConsoleMessage('error', 'Puter sign-in failed: ' + (e?.message || e));
+            }
+        });
+        if (puterSignOutBtn) puterSignOutBtn.addEventListener('click', async () => {
+            try {
+                await window.Puter?.auth?.signOut?.();
+            } catch {}
+            this.puterEnabled = false;
+            this.puterUser = null;
+            this.updatePuterStatusUI();
+            this.updateAIProviderControlsUI();
+            if (puterAccountStatus) puterAccountStatus.textContent = 'Puter: Signed out';
+            if (puterSignOutBtn) puterSignOutBtn.style.display = 'none';
+            if (puterAccountDetails) { puterAccountDetails.style.display = 'none'; puterAccountDetails.textContent = ''; }
+        });
+        if (puterStorageInfoBtn) puterStorageInfoBtn.addEventListener('click', async () => {
+            try {
+                const info = await window.PuterShim?.getStorageInfo?.();
+                if (puterAccountDetails) { puterAccountDetails.style.display = 'block'; puterAccountDetails.textContent = JSON.stringify(info, null, 2); }
+            } catch (e) {
+                this.addConsoleMessage('error', 'Failed to fetch storage info: ' + (e?.message || e));
+            }
+        });
+
         // Reasonings panel controls
         const reasoningSelect = document.getElementById('reasoningModeSelect');
         const toggleReasoningBtn = document.getElementById('toggleReasoningBtn');
@@ -1684,9 +1727,19 @@ export class App {
         const aiProviderSelect = document.getElementById('aiProviderSelect');
         const aiApiKeyInput = document.getElementById('aiApiKeyInput');
 
+        // If Puter is connected, only show Puter providers and default to GPT-5
+        let providers = [...this.availableAIProviders];
+        if (this.puterEnabled) {
+            providers = providers.filter(p => p.id.startsWith('puter:'));
+            if (!this.aiProvider || !this.aiProvider.startsWith('puter:')) {
+                this.aiProvider = 'puter:gpt-5';
+                this.saveAIPreferences();
+            }
+        }
+
         if (aiProviderSelect) {
             aiProviderSelect.innerHTML = '';
-            this.availableAIProviders.forEach(provider => {
+            providers.forEach(provider => {
                 const option = document.createElement('option');
                 option.value = provider.id;
                 option.textContent = provider.name;
@@ -1696,15 +1749,14 @@ export class App {
         }
 
         if (aiApiKeyInput) {
-            aiApiKeyInput.disabled = (this.aiProvider === 'websim');
-            if (this.aiProvider === 'websim') {
-                aiApiKeyInput.value = '';
-                aiApiKeyInput.placeholder = 'Not applicable for Websim AI (Free)';
-            } else {
-                aiApiKeyInput.value = this.aiApiKey;
-                aiApiKeyInput.placeholder = 'Enter API Key (optional)';
-            }
+            const isWebsim = this.aiProvider?.startsWith('websim');
+            aiApiKeyInput.disabled = isWebsim;
+            aiApiKeyInput.value = isWebsim ? '' : this.aiApiKey;
+            aiApiKeyInput.placeholder = isWebsim ? 'Not applicable for Websim AI (Free)' : 'Enter API Key (optional)';
         }
+
+        // Keep header AI badge in sync if external selector is present
+        try { window.setPreferredModel?.(this.aiProvider); } catch {}
     }
 
     selectAIProvider(providerId) {
