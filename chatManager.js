@@ -564,29 +564,49 @@ export class ChatManager {
 
             // Websim routing: use websim.chat.completions.create if available
             if (backend === 'websim' && window.websim && websim.chat && websim.chat.completions) {
-                // allow forcing model via provider id (falls back to payload.model)
                 const req = { ...payload };
                 if (model) req.model = model;
                 return await websim.chat.completions.create(req);
             }
 
-            // Puter routing: call PuterService.ai.chat with specified model if available
-            if (backend === 'puter' && window.PuterService && window.PuterService.ai && typeof window.PuterService.ai.chat === 'function') {
-                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
-                return await window.PuterService.ai.chat(opts);
+            // Puter routing: support multiple surfaces (PuterService, Puter, PuterAPI)
+            if (backend === 'puter') {
+                // Prefer PuterService if present (legacy expectation)
+                if (window.PuterService?.ai?.chat) {
+                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                    return await window.PuterService.ai.chat(opts);
+                }
+                // Fallback to Puter SDK directly
+                if (window.Puter?.ai?.chat) {
+                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                    return await window.Puter.ai.chat(opts);
+                }
+                // Fallback to PuterAPI shim
+                if (window.PuterAPI?.ai?.chat) {
+                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                    return await window.PuterAPI.ai.chat(opts);
+                }
             }
 
-            // Fallback to any available provider (try Puter then Websim)
-            if (window.PuterService && window.PuterService.ai && typeof window.PuterService.ai.chat === 'function') {
+            // Generic fallback: try Puter then Websim regardless of backend
+            if (window.PuterService?.ai?.chat) {
                 const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
                 return await window.PuterService.ai.chat(opts);
             }
-            if (window.websim && websim.chat && websim.chat.completions) {
+            if (window.Puter?.ai?.chat) {
+                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                return await window.Puter.ai.chat(opts);
+            }
+            if (window.PuterAPI?.ai?.chat) {
+                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                return await window.PuterAPI.ai.chat(opts);
+            }
+            if (window.websim?.chat?.completions) {
                 const req = { ...payload };
                 if (model) req.model = model;
                 return await websim.chat.completions.create(req);
             }
-            throw new Error('No available AI provider found (websim or PuterService).');
+            throw new Error('No available AI provider found (Puter or WebSim).');
         } catch (err) {
             throw err;
         }
