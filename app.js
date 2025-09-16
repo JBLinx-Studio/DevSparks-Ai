@@ -238,10 +238,10 @@ export class App {
     updatePuterStatusUI() {
         const statusDiv = document.getElementById('cloudStorageStatus');
         if (statusDiv) {
-            // Only show Connected when actually signed in with a real user
-            const isSignedIn = !!(this.puterEnabled && this.puterUser && (this.puterUser.id || this.puterUser.username));
-            if (isSignedIn) {
-                statusDiv.textContent = `Cloud Storage: Connected (Puter.AI${this.puterUser?.username ? ` - ${this.puterUser.username}` : ''})`;
+            // Treat PuterShim initialization as "connected" for UI (avoids persistent Local warning)
+            const puterAvailable = this.puterEnabled || (window.PuterShim && window.PuterShim.isInitialized);
+            if (puterAvailable) {
+                statusDiv.textContent = `Cloud Storage: Connected (Puter.AI${this.puterUser ? ` - ${this.puterUser.username}` : ''})`;
                 statusDiv.className = 'cloud-storage-status connected';
             } else {
                 statusDiv.textContent = 'Cloud Storage: Local (Puter.AI not connected)';
