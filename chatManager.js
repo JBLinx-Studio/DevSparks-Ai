@@ -358,24 +358,22 @@ export class ChatManager {
             // The AI's message will then be processed and displayed.
             this.stopLoadingAnimation();
 
-            // Normalize provider responses into a raw string
-            let raw = '';
-            try {
-                if (typeof completion === 'string') raw = completion;
-                else if (completion?.content) raw = completion.content;
-                else if (completion?.message?.content) raw = completion.message.content;
-                else if (completion?.choices?.[0]?.message?.content) raw = completion.choices[0].message.content;
-                else if (completion?.text) raw = completion.text;
-                else raw = JSON.stringify(completion ?? {});
-            } catch (_) { raw = String(completion ?? ''); }
-
             let parsedResponse;
             try {
-                parsedResponse = JSON.parse(raw);
+                parsedResponse = JSON.parse(completion.content);
             } catch (jsonError) {
-                // Try to salvage JSON from within raw
-                const fallbackResponse = this.extractFallbackResponse(raw);
-                parsedResponse = fallbackResponse || { message: raw || "I'm connected and ready.", files: {} };
+                console.error("Error parsing AI response JSON:", jsonError);
+                console.error("Raw AI response content:", completion.content);
+
+                const fallbackResponse = this.extractFallbackResponse(completion.content);
+                if (fallbackResponse) {
+                    parsedResponse = fallbackResponse;
+                } else {
+                    parsedResponse = {
+                        message: "I apologize, but I encountered an issue with my response format. Please try again or rephrase your request.",
+                        files: {}
+                    };
+                }
             }
 
             if (typeof parsedResponse.message !== 'string') {
@@ -556,73 +554,57 @@ export class ChatManager {
         }
     }
 
+    // NEW: choose provider at runtime and call appropriate API (websim or PuterService)
     async requestAIResponse(payload) {
         try {
-            // Helpers: timeout and stream consumption
-            const isAsyncIterable = (obj) => obj && typeof obj[Symbol.asyncIterator] === 'function';
-            const withTimeout = (p, ms = 20000) => Promise.race([
-                p,
-                new Promise((_, rej) => setTimeout(() => rej(new Error('AI request timed out')), ms))
-            ]);
-            const resolveResult = async (promise) => {
-                const result = await withTimeout(promise);
-                if (isAsyncIterable(result)) {
-                    let text = '';
-                    for await (const chunk of result) {
-                        const piece = (chunk && (chunk.delta?.content || chunk.content || chunk.text)) || '';
-                        text += piece;
-                    }
-                    return text;
-                }
-                return result;
-            };
-
             // Prefer the user's selected model (Puter KV / localStorage) when available
             const pref = (window.getPreferredModel) ? await window.getPreferredModel() : (this.app.aiProvider || 'websim:gpt5-nano');
-            let backend = 'websim';
-            let model = 'gpt-5-nano';
-            if (pref && pref.includes(':')) {
-                const parts = pref.split(':');
-                backend = parts[0] || backend;
-                model = parts[1] || model;
-            } else {
-                // Infer backend when only model id is stored
-                if (window.Puter?.ai?.chat || window.PuterService?.ai?.chat || window.PuterAPI?.ai?.chat) backend = 'puter';
-                model = pref || model;
-            }
+            const providerId = pref || (this.app.aiProvider || 'websim:gpt5-nano');
+            const [backend, model] = (providerId || 'websim:gpt5-nano').split(':');
 
             // Websim routing: use websim.chat.completions.create if available
-            if (backend === 'websim' && window.websim?.chat?.completions) {
+            if (backend === 'websim' && window.websim && websim.chat && websim.chat.completions) {
                 const req = { ...payload };
                 if (model) req.model = model;
-                return await resolveResult(websim.chat.completions.create(req));
+                return await websim.chat.completions.create(req);
             }
 
             // Puter routing: support multiple surfaces (PuterService, Puter, PuterAPI)
             if (backend === 'puter') {
-                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json, stream: false };
+                // Prefer PuterService if present (legacy expectation)
                 if (window.PuterService?.ai?.chat) {
-                    return await resolveResult(window.PuterService.ai.chat(opts));
+                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                    return await window.PuterService.ai.chat(opts);
                 }
+                // Fallback to Puter SDK directly
                 if (window.Puter?.ai?.chat) {
-                    return await resolveResult(window.Puter.ai.chat(opts));
+                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                    return await window.Puter.ai.chat(opts);
                 }
+                // Fallback to PuterAPI shim
                 if (window.PuterAPI?.ai?.chat) {
-                    return await resolveResult(window.PuterAPI.ai.chat(opts));
+                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                    return await window.PuterAPI.ai.chat(opts);
                 }
             }
 
             // Generic fallback: try Puter then Websim regardless of backend
-            {
-                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json, stream: false };
-                if (window.PuterService?.ai?.chat) return await resolveResult(window.PuterService.ai.chat(opts));
-                if (window.Puter?.ai?.chat) return await resolveResult(window.Puter.ai.chat(opts));
-                if (window.PuterAPI?.ai?.chat) return await resolveResult(window.PuterAPI.ai.chat(opts));
+            if (window.PuterService?.ai?.chat) {
+                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                return await window.PuterService.ai.chat(opts);
+            }
+            if (window.Puter?.ai?.chat) {
+                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                return await window.Puter.ai.chat(opts);
+            }
+            if (window.PuterAPI?.ai?.chat) {
+                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                return await window.PuterAPI.ai.chat(opts);
             }
             if (window.websim?.chat?.completions) {
                 const req = { ...payload };
                 if (model) req.model = model;
-                return await resolveResult(websim.chat.completions.create(req));
+                return await websim.chat.completions.create(req);
             }
             throw new Error('No available AI provider found (Puter or WebSim).');
         } catch (err) {
