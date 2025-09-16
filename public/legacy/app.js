@@ -219,9 +219,25 @@ export class App {
             window.addEventListener('puter:signin', (event) => {
                 this.puterUser = event.detail;
                 this.puterEnabled = true;
-                this.addConsoleMessage('success', `Successfully signed in to Puter.AI as ${this.puterUser.username || this.puterUser.id}`);
                 this.updatePuterStatusUI();
                 this.updateAccountInfoUI();
+
+                // Auto-switch AI to Puter GPT-5 and refresh UI + selector badge
+                this.selectAIProvider('puter:gpt-5');
+                try { window.setPreferredModel?.('puter:gpt-5'); window.pickModel?.('puter:gpt-5'); } catch {}
+
+                // Update Options modal Puter section with debug info
+                this.getDetailedPuterInfo().then(info => {
+                    try {
+                        const s = document.getElementById('puterAccountStatus');
+                        const d = document.getElementById('puterAccountDetails');
+                        if (s) s.textContent = `Puter: Connected — ${this.puterUser.username || this.puterUser.id}`;
+                        if (d) { 
+                            d.style.display = 'block'; 
+                            d.textContent = JSON.stringify({ whoami: this.puterUser }, null, 2); 
+                        }
+                    } catch {}
+                }).catch(() => {});
             });
             
             window.addEventListener('puter:signout', () => {
@@ -395,6 +411,35 @@ export class App {
 
         document.getElementById('optionsBtn').addEventListener('click', () => this.showOptionsModal());
         document.getElementById('closeOptionsModal').addEventListener('click', () => this.hideOptionsModal());
+
+        // Puter options actions
+        document.getElementById('puterOptionsSignInBtn')?.addEventListener('click', () => this.showPuterSignIn());
+        document.getElementById('puterOptionsSignOutBtn')?.addEventListener('click', async () => {
+            try { await (window.lovablePuter?.signOut?.() || window.Puter?.auth?.signOut?.()); } catch {}
+            this.puterUser = null;
+            this.puterEnabled = false;
+            this.updatePuterStatusUI();
+            this.updateAIProviderControlsUI();
+            try {
+                const s = document.getElementById('puterAccountStatus');
+                const d = document.getElementById('puterAccountDetails');
+                const btnIn = document.getElementById('puterOptionsSignInBtn');
+                const btnOut = document.getElementById('puterOptionsSignOutBtn');
+                if (s) s.textContent = 'Puter: Not connected';
+                if (btnIn) btnIn.style.display = '';
+                if (btnOut) btnOut.style.display = 'none';
+                if (d) { d.style.display = 'none'; d.textContent = ''; }
+            } catch {}
+        });
+        document.getElementById('puterOptionsStorageInfoBtn')?.addEventListener('click', async () => {
+            try {
+                const info = await this.getDetailedPuterInfo();
+                const d = document.getElementById('puterAccountDetails');
+                if (d) { d.style.display = 'block'; d.textContent = JSON.stringify(info, null, 2); }
+            } catch (e) {
+                this.addConsoleMessage('warn', 'Failed to fetch Puter debug info');
+            }
+        });
 
         document.getElementById('mainPanelTabs').addEventListener('click', (e) => {
             if (e.target.classList.contains('panel-tab')) {
@@ -1785,20 +1830,31 @@ export class App {
         const aiProviderSelect = document.getElementById('aiProviderSelect');
         const aiApiKeyInput = document.getElementById('aiApiKeyInput');
 
+        // When signed into Puter, only show Puter providers and auto-select GPT-5
+        const providers = this.puterEnabled
+            ? this.availableAIProviders.filter(p => p.id.startsWith('puter:'))
+            : this.availableAIProviders;
+
         if (aiProviderSelect) {
             aiProviderSelect.innerHTML = '';
-            this.availableAIProviders.forEach(provider => {
+            providers.forEach(provider => {
                 const option = document.createElement('option');
                 option.value = provider.id;
                 option.textContent = provider.name;
                 aiProviderSelect.appendChild(option);
             });
+            // Auto-switch when Puter becomes available
+            if (this.puterEnabled && (!this.aiProvider || !this.aiProvider.startsWith('puter:'))) {
+                this.aiProvider = 'puter:gpt-5';
+                this.saveAIPreferences();
+                try { window.setPreferredModel?.('puter:gpt-5'); window.pickModel?.('puter:gpt-5'); } catch {}
+            }
             aiProviderSelect.value = this.aiProvider;
         }
 
         if (aiApiKeyInput) {
-            aiApiKeyInput.disabled = (this.aiProvider === 'websim');
-            if (this.aiProvider === 'websim') {
+            aiApiKeyInput.disabled = (!this.aiProvider || this.aiProvider.startsWith('websim'));
+            if (!this.aiProvider || this.aiProvider.startsWith('websim')) {
                 aiApiKeyInput.value = '';
                 aiApiKeyInput.placeholder = 'Not applicable for Websim AI (Free)';
             } else {
@@ -1826,6 +1882,63 @@ export class App {
         localStorage.setItem('aiApiKey', this.aiApiKey);
     }
 
+    async getDetailedPuterInfo() {
+        const info = { connected: false, user: null, debug: {}, errors: [] };
+        
+        try {
+            // Test 1: Check if Puter SDK is loaded
+            info.debug.sdkLoaded = !!(window.Puter || window.puter);
+            info.debug.sdkKeys = window.Puter ? Object.keys(window.Puter) : [];
+            
+            // Test 2: Try whoami() with detailed error capture
+            if (window.Puter?.identity?.whoami) {
+                try {
+                    const whoamiResult = await window.Puter.identity.whoami();
+                    info.user = whoamiResult;
+                    info.connected = !!(whoamiResult && whoamiResult.success !== false);
+                    info.debug.whoamiSuccess = true;
+                } catch (whoamiError) {
+                    info.debug.whoamiError = {
+                        message: whoamiError.message || 'Unknown error',
+                        code: whoamiError.code || 'NO_CODE',
+                        name: whoamiError.name || 'Error'
+                    };
+                    info.errors.push(`whoami failed: ${whoamiError.message || whoamiError}`);
+                }
+            } else {
+                info.errors.push('Puter.identity.whoami not available');
+            }
+            
+            // Test 3: Check auth.currentUser
+            if (window.Puter?.auth?.currentUser) {
+                info.debug.authCurrentUser = window.Puter.auth.currentUser;
+            }
+            
+            // Test 4: Session/token info
+            if (window.Puter?.session) {
+                info.debug.session = {
+                    exists: true,
+                    token: window.Puter.session.token ? 'present' : 'missing'
+                };
+            }
+            
+            // Test 5: Check for rate limiting or specific error patterns
+            try {
+                const storageInfo = await window.PuterShim?.getStorageInfo?.();
+                if (storageInfo) {
+                    info.debug.storageInfo = storageInfo;
+                }
+            } catch (storageError) {
+                info.debug.storageError = storageError.message;
+            }
+            
+        } catch (generalError) {
+            info.errors.push(`General error: ${generalError.message}`);
+        }
+        
+        return info;
+    }
+
     updateAccountInfoUI() {
         const usernameDisplay = document.getElementById('usernameDisplay');
         const userIdDisplay = document.getElementById('userIdDisplay');
@@ -1845,6 +1958,32 @@ export class App {
             userIdDisplay.textContent = 'Not available';
             userAvatar.style.display = 'none';
         }
+
+        // Update Puter account status in Options modal with debug info
+        this.getDetailedPuterInfo().then(info => {
+            try {
+                const s = document.getElementById('puterAccountStatus');
+                const d = document.getElementById('puterAccountDetails');
+                
+                if (info.connected && info.user) {
+                    if (s) s.textContent = `Puter: Connected — ${info.user.username || info.user.id}`;
+                    if (d && d.style.display !== 'block') { 
+                        d.style.display = 'block'; 
+                        d.textContent = JSON.stringify({ whoami: info.user }, null, 2); 
+                    }
+                } else {
+                    if (s) s.textContent = 'Puter: Not connected';
+                    if (d && d.style.display !== 'block') { 
+                        d.style.display = 'block'; 
+                        d.textContent = JSON.stringify(info, null, 2); 
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to update Puter account info UI:', e);
+            }
+        }).catch(e => {
+            console.error('Failed to get detailed Puter info:', e);
+        });
     }
 
     showOptionsModal() {
@@ -2410,14 +2549,32 @@ export class App {
         // after rendering tree, refresh editor dropdowns
         this.populateEditorScriptSelect();
         this.populateConsoleScriptSelect();
+        
+        // Ensure dropdowns are properly initialized
+        setTimeout(() => {
+            this.populateEditorScriptSelect();
+            this.populateConsoleScriptSelect();
+        }, 100);
     }
 
     populateEditorScriptSelect() {
         const select = document.getElementById('editorScriptSelect');
-        if (!select) return;
+        if (!select) {
+            console.warn('editorScriptSelect element not found');
+            return;
+        }
         const prev = select.value;
         select.innerHTML = '';
         const files = Object.keys(this.currentFiles || {}).sort();
+        
+        if (files.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No files available';
+            select.appendChild(opt);
+            return;
+        }
+        
         files.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
@@ -2431,12 +2588,19 @@ export class App {
             select.value = prev;
         } else if (files.length > 0) {
             select.value = files[0];
+            // Update currentFile if nothing was selected
+            if (!this.currentFile) {
+                this.currentFile = files[0];
+            }
         }
     }
 
     populateConsoleScriptSelect() {
         const select = document.getElementById('consoleScriptSelect');
-        if (!select) return;
+        if (!select) {
+            console.warn('consoleScriptSelect element not found');
+            return;
+        }
         const prev = select.value;
         select.innerHTML = '';
         // Console targets: show JS, HTML and key config files to allow quick inspection
@@ -2445,19 +2609,27 @@ export class App {
             const ext = f.split('.').pop().toLowerCase();
             return preferredExts.includes(ext) || f.toLowerCase().includes('log') || f.toLowerCase().includes('config') || f.toLowerCase().includes('package.json');
         }).sort();
+        
+        if (files.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No console targets';
+            select.appendChild(opt);
+            return;
+        }
+        
         files.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
             opt.textContent = f;
             select.appendChild(opt);
         });
-        if (files.length === 0) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = 'No console targets';
-            select.appendChild(opt);
+        
+        if (prev && files.includes(prev)) {
+            select.value = prev;
+        } else if (files.length > 0) {
+            select.value = files[0];
         }
-        if (prev && files.includes(prev)) select.value = prev;
     }
 
     async loadDeploymentInfo() {

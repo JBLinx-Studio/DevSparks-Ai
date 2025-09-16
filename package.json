@@ -16,9 +16,11 @@
   },
   "dependencies": {
     "autoprefixer": "^10.4.19",
+    "clsx": "^2.1.1",
     "dompurify": "^2.4.0",
     "esbuild": "^0.19.0",
     "esbuild-wasm": "^0.19.0",
+    "lucide-react": "^0.544.0",
     "marked": "^5.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
