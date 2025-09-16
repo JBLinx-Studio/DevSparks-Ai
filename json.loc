@@ -1,0 +1,9 @@
+{
+  "projectName": "visionstack",
+  "version": "0.0.1",
+  "type": "module",
+  "platform": "lovable",
+  "description": "VisionStack — fully Lovable-compatible AI web app",
+  "author": "",
+  "license": "MIT"
+}

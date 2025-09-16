@@ -1,4 +1,4 @@
-import { App } from "app";
+import { App } from "./app.js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 
@@ -570,71 +570,42 @@ export class ChatManager {
         }
     }
 
-    // AI provider routing - supports Puter AI and fallback mock responses
+    // NEW: choose provider at runtime and call appropriate API (websim or PuterService)
     async requestAIResponse(payload) {
         try {
-            // First try Puter AI service if available
-            if (window.PuterService && window.PuterService.ai && typeof window.PuterService.ai.chat === 'function') {
-                console.log('Using Puter AI service');
-                const opts = { 
-                    model: 'gpt-5-nano',
-                    messages: payload.messages, 
-                    json: payload.json 
-                };
-                const response = await window.PuterService.ai.chat(opts);
-                return response;
+            // Prefer the user's selected model (Puter KV / localStorage) when available
+            const pref = (window.getPreferredModel) ? await window.getPreferredModel() : (this.app.aiProvider || 'websim:gpt5-nano');
+            const providerId = pref || (this.app.aiProvider || 'websim:gpt5-nano');
+            const [backend, model] = (providerId || 'websim:gpt5-nano').split(':');
+
+            // Websim routing: use websim.chat.completions.create if available
+            if (backend === 'websim' && window.websim && websim.chat && websim.chat.completions) {
+                // allow forcing model via provider id (falls back to payload.model)
+                const req = { ...payload };
+                if (model) req.model = model;
+                return await websim.chat.completions.create(req);
             }
 
-            // If no Puter AI, provide intelligent fallback responses
-            console.log('No AI service available, using fallback responses');
-            const userMessage = payload.messages[payload.messages.length - 1]?.content || '';
-            const fallbackResponse = this.generateFallbackResponse(userMessage);
-            
-            return {
-                content: JSON.stringify(fallbackResponse)
-            };
+            // Puter routing: call PuterService.ai.chat with specified model if available
+            if (backend === 'puter' && window.PuterService && window.PuterService.ai && typeof window.PuterService.ai.chat === 'function') {
+                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                return await window.PuterService.ai.chat(opts);
+            }
+
+            // Fallback to any available provider (try Puter then Websim)
+            if (window.PuterService && window.PuterService.ai && typeof window.PuterService.ai.chat === 'function') {
+                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                return await window.PuterService.ai.chat(opts);
+            }
+            if (window.websim && websim.chat && websim.chat.completions) {
+                const req = { ...payload };
+                if (model) req.model = model;
+                return await websim.chat.completions.create(req);
+            }
+            throw new Error('No available AI provider found (websim or PuterService).');
         } catch (err) {
-            console.error('AI request failed:', err);
-            // Generate helpful fallback response
-            const userMessage = payload.messages[payload.messages.length - 1]?.content || '';
-            const fallbackResponse = this.generateFallbackResponse(userMessage);
-            
-            return {
-                content: JSON.stringify(fallbackResponse)
-            };
+            throw err;
         }
-    }
-
-    generateFallbackResponse(userMessage) {
-        const lowerMessage = userMessage.toLowerCase();
-        
-        // Detect common intents and provide helpful responses
-        if (lowerMessage.includes('create') || lowerMessage.includes('make') || lowerMessage.includes('build')) {
-            return {
-                message: "I'd love to help you create something! However, I'm currently running in demo mode without full AI capabilities. You can still use the file editor on the right to create HTML, CSS, and JavaScript files manually. Try creating an `index.html` file to get started!",
-                files: {}
-            };
-        }
-        
-        if (lowerMessage.includes('help') || lowerMessage.includes('how')) {
-            return {
-                message: "**Welcome to VisionStack!** 🚀\n\nThis is a powerful web development environment. Here's what you can do:\n\n- **File Management**: Use the sidebar to create and organize your files\n- **Live Preview**: See your changes instantly in the preview panel\n- **Code Editor**: Full-featured editor with syntax highlighting\n- **GitHub Integration**: Connect and sync with your repositories\n\n*Note: AI assistance is currently limited in this demo mode.*",
-                files: {}
-            };
-        }
-
-        if (lowerMessage.includes('error') || lowerMessage.includes('fix') || lowerMessage.includes('debug')) {
-            return {
-                message: "I can help with debugging! Check the **Console** tab in the right panel for any error messages. Common issues include:\n\n- Missing semicolons in JavaScript\n- Typos in file names or paths\n- Unclosed HTML tags\n- CSS syntax errors\n\nFeel free to share the specific error you're seeing!",
-                files: {}
-            };
-        }
-
-        // Default helpful response
-        return {
-            message: "Thanks for your message! I'm currently running in demo mode with limited AI capabilities. You can still use all the development tools:\n\n✨ **Try these features:**\n- Create files using the sidebar\n- Edit code in the main editor\n- See live previews\n- Use the console for debugging\n- Connect to GitHub for version control\n\nWhat would you like to work on?",
-            files: {}
-        };
     }
 
     async handleCreateProjectCommand(userMessage) {
