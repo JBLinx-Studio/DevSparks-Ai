@@ -6,9 +6,21 @@
   // normalize Puter global (SDK may expose lowercase `puter`)
   if (!window.Puter && window.puter) window.Puter = window.puter;
   const PUTER = window.Puter || window.PuterService || window.PuterShim || null;
-  // disable legacy red status banner; use white popup instead
-  let statusEl = null;
-  function setStatus(text, ok = false) { /* no-op */ }
+  // create visible status element
+  let statusEl = document.getElementById('puter-status');
+  if (!statusEl) {
+    statusEl = document.createElement('div');
+    statusEl.id = 'puter-status';
+    statusEl.style.cssText = 'position:fixed;right:12px;bottom:12px;padding:8px 12px;border-radius:0;background:#d33;color:#fff;z-index:9999;font-family:system-ui;cursor:pointer';
+    statusEl.innerText = 'Puter: initializing...';
+    document.body.appendChild(statusEl);
+  }
+
+  function setStatus(text, ok = false) {
+    statusEl.innerText = text;
+    statusEl.style.background = ok ? '#0aa' : '#d33';
+    statusEl.title = text;
+  }
 
   // safe API access helpers (best-effort)
   const api = {
@@ -149,10 +161,26 @@
     console.warn('isSignedIn check failed', e);
   }
 
-  // not signed -> show white Puter sign-in popup if available (no red banner)
-  try { if (window.puterSignIn && typeof window.puterSignIn.show === 'function') window.puterSignIn.show(); } catch (e) {}
-  // Also dispatch a gentle hint event (no UI)
-  try { window.dispatchEvent(new CustomEvent('puter:needs-signin')); } catch {}
+  // not signed -> set clickable banner (user click required for popup)
+  setStatus('Puter: Not connected (click to sign in)', false);
+  statusEl.onclick = async () => {
+    try {
+      setStatus('Puter: Signing in…', false);
+      const user = await api.signIn();
+      if (user) {
+        await afterSignInInit(user);
+      } else {
+        setStatus('Puter: sign-in incomplete', false);
+      }
+    } catch (err) {
+      console.error('Puter signIn failed', err);
+      // show actionable error to user (frontend-only)
+      const reason = err?.message || (err && JSON.stringify(err)) || 'Unknown error';
+      setStatus(`Puter: sign-in failed — ${reason}`, false);
+      // re-enable click after failure
+      setTimeout(() => { setStatus('Puter: Not connected (click to sign in)', false); }, 800);
+    }
+  };
 
   // Expose tiny KV helpers for preferred AI model with Puter-first fallback
   window.getPreferredModel = async function() {

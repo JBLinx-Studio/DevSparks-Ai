@@ -358,30 +358,16 @@ export class ChatManager {
             // The AI's message will then be processed and displayed.
             this.stopLoadingAnimation();
 
-            // Normalize provider responses into a raw string
-            let raw = '';
-            try {
-                if (typeof completion === 'string') raw = completion;
-                else if (completion?.content) raw = completion.content;
-                else if (completion?.message?.content) raw = completion.message.content;
-                else if (completion?.choices?.[0]?.message?.content) raw = completion.choices[0].message.content;
-                else if (completion?.text) raw = completion.text;
-                else raw = JSON.stringify(completion ?? {});
-            } catch (_) { raw = String(completion ?? ''); }
-
             let parsedResponse;
             try {
-                parsedResponse = JSON.parse(raw);
+                parsedResponse = JSON.parse(completion.content);
             } catch (jsonError) {
-                // Try to salvage JSON from within raw
-                const fallbackResponse = this.extractFallbackResponse(raw);
+                console.error("Error parsing AI response JSON:", jsonError);
+                console.error("Raw AI response content:", completion.content);
+
+                const fallbackResponse = this.extractFallbackResponse(completion.content);
                 if (fallbackResponse) {
                     parsedResponse = fallbackResponse;
-                } else {
-                    // Treat provider output as plain assistant text
-                    parsedResponse = { message: raw || "I'm connected and ready.", files: {} };
-                }
-            }
                 } else {
                     parsedResponse = {
                         message: "I apologize, but I encountered an issue with my response format. Please try again or rephrase your request.",
