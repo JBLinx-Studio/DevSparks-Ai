@@ -153,7 +153,7 @@ class PuterIntegration {
   async getUser(): Promise<PuterUser> {
     await this.initInBackground();
     const sdk = (window as any).Puter;
-    this.user = this.user || sdk?.auth?.currentUser ?? null;
+    this.user = this.user ?? (sdk?.auth?.currentUser ?? null);
     return this.user;
   }
 
