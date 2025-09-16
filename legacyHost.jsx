@@ -84,3 +84,4 @@ export default function LegacyHost() {
   // Render nothing visible - this component just ensures scripts are loaded
   return null;
 }
+```

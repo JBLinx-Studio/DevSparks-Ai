@@ -2,8 +2,7 @@
 const PuterAPI = {
   async ensureInit() {
     await (window.PuterShim?.init?.() || Promise.resolve());
-    if (!window.Puter && window.puter) window.Puter = window.puter;
-    return window.Puter || window.puter;
+    return window.Puter;
   },
 
   fs: {

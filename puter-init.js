@@ -3,12 +3,22 @@
 // initializes a user folder, writes a last-login KV entry, and exposes testing/migration helpers.
 
 (async function puterInit() {
-  // normalize Puter global (SDK may expose lowercase `puter`)
-  if (!window.Puter && window.puter) window.Puter = window.puter;
   const PUTER = window.Puter || window.PuterService || window.PuterShim || null;
-  // disable legacy red status banner; use white popup instead
-  let statusEl = null;
-  function setStatus(text, ok = false) { /* no-op */ }
+  // create visible status element
+  let statusEl = document.getElementById('puter-status');
+  if (!statusEl) {
+    statusEl = document.createElement('div');
+    statusEl.id = 'puter-status';
+    statusEl.style.cssText = 'position:fixed;right:12px;bottom:12px;padding:8px 12px;border-radius:0;background:#d33;color:#fff;z-index:9999;font-family:system-ui;cursor:pointer';
+    statusEl.innerText = 'Puter: initializing...';
+    document.body.appendChild(statusEl);
+  }
+
+  function setStatus(text, ok = false) {
+    statusEl.innerText = text;
+    statusEl.style.background = ok ? '#0aa' : '#d33';
+    statusEl.title = text;
+  }
 
   // safe API access helpers (best-effort)
   const api = {
@@ -149,10 +159,26 @@
     console.warn('isSignedIn check failed', e);
   }
 
-  // not signed -> show white Puter sign-in popup if available (no red banner)
-  try { if (window.puterSignIn && typeof window.puterSignIn.show === 'function') window.puterSignIn.show(); } catch (e) {}
-  // Also dispatch a gentle hint event (no UI)
-  try { window.dispatchEvent(new CustomEvent('puter:needs-signin')); } catch {}
+  // not signed -> set clickable banner (user click required for popup)
+  setStatus('Puter: Not connected (click to sign in)', false);
+  statusEl.onclick = async () => {
+    try {
+      setStatus('Puter: Signing in…', false);
+      const user = await api.signIn();
+      if (user) {
+        await afterSignInInit(user);
+      } else {
+        setStatus('Puter: sign-in incomplete', false);
+      }
+    } catch (err) {
+      console.error('Puter signIn failed', err);
+      // show actionable error to user (frontend-only)
+      const reason = err?.message || (err && JSON.stringify(err)) || 'Unknown error';
+      setStatus(`Puter: sign-in failed — ${reason}`, false);
+      // re-enable click after failure
+      setTimeout(() => { setStatus('Puter: Not connected (click to sign in)', false); }, 800);
+    }
+  };
 
   // Expose tiny KV helpers for preferred AI model with Puter-first fallback
   window.getPreferredModel = async function() {
@@ -205,6 +231,46 @@
 
   // expose a lightweight test method on window to allow external callers to trigger the same flow
   window.__puterInit = { statusEl, setStatus };
+
+  // remove legacy puter-init.js (replaced by TS initializer)
+  // Note: this file is intentionally left present as a compatibility shim that forwards to the new PuterIntegration when loaded.
+  (async function legacyPuterInitForwarder() {
+    // If the modern PuterIntegration is available (Lovable / Vite path), prefer it.
+    try {
+      // wait briefly for the TS module to initialize (Vite dev server will load /src)
+      const maxWait = 3000;
+      const start = Date.now();
+      while (!window.PuterIntegration && Date.now() - start < maxWait) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+      if (window.PuterIntegration && typeof window.PuterIntegration.runDiagnostics === 'function') {
+        // expose small helpers to the global namespace for backwards compatibility
+        window._puterLegacy = {
+          signIn: () => window.PuterIntegration.signIn(),
+          signOut: () => window.PuterIntegration.signOut(),
+          getUser: () => window.PuterIntegration.getUser(),
+          runDiagnostics: () => window.PuterIntegration.runDiagnostics()
+        };
+        // update UI badge if present
+        try { document.getElementById('cloudStorageStatus') && window.PuterIntegration.getUser().then(u => {
+          const statusEl = document.getElementById('cloudStorageStatus');
+          if (statusEl) statusEl.textContent = u ? `Cloud Storage: Connected (Puter.AI — ${u.username || u.id})` : 'Cloud Storage: Local (Puter.AI not connected)';
+        }); } catch (e) {}
+        return;
+      }
+    } catch (e) {
+      // fall through to very small fallback so old code doesn't crash
+    }
+
+    // Fallback minimal shim (non-fatal)
+    window._puterLegacy = {
+      signIn: async () => { throw new Error('PuterIntegration not initialized'); },
+      signOut: async () => { throw new Error('PuterIntegration not initialized'); },
+      getUser: async () => null,
+      runDiagnostics: async () => ({ ok: false, reason: 'PuterIntegration missing' })
+    };
+  })();
+
   // run initial badge check after puter-init completes (best-effort)
   try { window.checkAndSetProjectBadge?.(); } catch(e){/* ignore */}
 })()

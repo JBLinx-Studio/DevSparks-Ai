@@ -8,11 +8,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <!-- Puter.js SDK (required by Puter integration) -->
     <script src="https://js.puter.com/v2/"></script>
-    <!-- Using unified puter_integration.js; legacy puter-init removed -->
-    
-    <!-- Monaco loader (AMD) for the in-browser Monaco Editor -->
-    <script src="https://unpkg.com/monaco-editor@0.39.0/min/vs/loader.js"></script>
-    
+    <!-- Puter integration (Lovable-ready UMD/ESM wrapper): ensure compiled JS is loaded before app -->
+    <script type="module" src="/puter_integration.js"></script>
+
     <script type="importmap">
         {
             "imports": {
@@ -20,14 +18,16 @@
                 "chatManager": "./chatManager.js",
                 "githubManager": "./githubManager.js",
                 "previewManager": "./previewManager.js",
+                "react": "https://esm.sh/react@18",
+                "react-dom": "https://esm.sh/react-dom@18",
                 "react-dom/client": "https://esm.sh/react-dom@18/client",
                 "marked": "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js",
-                "dompurify": "https://cdn.jsdelivr.net/npm/dompurify/dist/purify.es.min.js",
-                "react": "https://esm.sh/react@18",
-                "react-dom": "https://esm.sh/react-dom@18"
+                "dompurify": "https://cdn.jsdelivr.net/npm/dompurify/dist/purify.es.min.js"
             }
         }
     </script>
+    <!-- Monaco loader (AMD) for the in-browser Monaco Editor -->
+    <script src="https://unpkg.com/monaco-editor@0.39.0/min/vs/loader.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -53,7 +53,7 @@
                 <div class="header-actions">
                     <button class="btn btn-secondary" id="optionsBtn">
                         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.17.311a1.464 1.464 0 0 1 .872 2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.17a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2 0 1 0 0-5.86 2.929 2 0 0 0 0 5.86z"/>
+                            <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.17.311a1.464 1.464 0 0 1 .872 2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.17a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 4.466V.534l2.707 2.707-.707.707L8 4.466z"/>
                         </svg>
                         Options
                     </button>
@@ -500,7 +500,6 @@
     <script type="module" src="githubManager.js"></script>
     <script type="module" src="chatManager.js"></script>
     <!-- Puter integration must be available before app initializes -->
-    <script type="module" src="puter_integration.js"></script>
     <script type="module" src="puter_services.js"></script>
     <script type="module" src="puter_dictation.js"></script>
     <script type="module" src="app.js"></script>
@@ -512,11 +511,16 @@
     // Open Puter tutorials in a new tab
     document.addEventListener('DOMContentLoaded', () => {
       const tutBtn = document.getElementById('puterTutorialsBtn');
-      if (tutBtn) tutBtn.addEventListener('click', () => window.open('https://developer.puter.com/tutorials/', '_blank'));
+      if (tutBtn) tutBtn.addEventListener('click', async () => {
+        // Prefer integrated tutorials helper (Lovable-friendly), fallback to known URL
+        try {
+          if (window.puterTutorials && typeof window.puterTutorials.open === 'function') return window.puterTutorials.open();
+        } catch (e) { /* ignore */ }
+        window.open('https://developer.puter.com/tutorials/', '_blank');
+      });
     });
     </script>
 
-    <!-- Add Lovable-friendly import maps and prefer ES modules (no other changes) -->
     <script type="module">
       // Ensure the new TypeScript-built integration is loaded (Vite will map /src)
       import puter from '/src/integrations/puter/puter_integration.ts';
@@ -524,13 +528,24 @@
       window.lovablePuter = puter;
       // Refresh UI badge if present
       document.addEventListener('DOMContentLoaded', () => {
-        try { document.getElementById('puterInfoBtn')?.addEventListener('click', () => puter.runDiagnostics().then(r => console.info('Puter diagnostics', r))); } catch(e) {}
+        try {
+          document.getElementById('puterInfoBtn')?.addEventListener('click', async () => {
+            const diag = await (puter.runDiagnostics ? puter.runDiagnostics() : (window.PuterIntegration?.runDiagnostics?.() || null));
+            console.info('Puter diagnostics', diag);
+          });
+        } catch(e) { console.warn('Failed to wire Puter info button', e); }
       });
     </script>
 
     <script type="module">
-      // Optional: Initialize any demo components if needed
-      console.log('VisionStack initialized');
+      import React from "https://esm.sh/react@18";
+      import { createRoot } from "https://esm.sh/react-dom@18/client";
+      import PuterDemo from "/src/pages/puter_demo.tsx";
+
+      const mount = document.createElement('div');
+      mount.id = 'puter-demo-mount';
+      document.body.appendChild(mount);
+      createRoot(mount).render(React.createElement(PuterDemo));
     </script>
 </body>
 </html>
