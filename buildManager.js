@@ -121,7 +121,33 @@ export async function bundleSources(sources, entry, options = {}) {
           const ext = (path.split('.').pop() || '').toLowerCase();
           const loaderMap = { ts: 'ts', tsx: 'tsx', jsx: 'jsx', css: 'css', json: 'json', js: 'js', mjs: 'js', cjs: 'js' };
           const loader = loaderMap[ext] || 'js';
-          return { contents: sources[path], loader };
+          let contents = String(sources[path]);
+
+          // Heuristic compatibility shims for common React/Vite patterns
+          if (ext === 'ts' || ext === 'tsx' || ext === 'jsx' || ext === 'js') {
+            const hasDefault = /(^|\n)\s*export\s+default\b/m.test(contents);
+
+            // 1) If there is a named export matching the file's PascalCase basename and no default export, add `export default <Name>;`
+            if (!hasDefault) {
+              const baseName = (path.split('/').pop() || '').replace(/\.[^.]+$/, '');
+              const nameRegex = new RegExp(`(^|\\n)\\s*export\\s+(?:const|function|class)\\s+${baseName}\\b`);
+              if (nameRegex.test(contents)) {
+                contents += `\n\n// Auto-added by in-browser bundler for preview compatibility\nexport default ${baseName};\n`;
+              }
+            }
+
+            // 2) If default export is a named declaration like `export default function X()` or `export default class X`, also expose named export: `export { default as X }`
+            const defaultNamedMatch = contents.match(/export\s+default\s+(?:function|class)\s+([A-Za-z0-9_]+)/);
+            if (defaultNamedMatch) {
+              const defName = defaultNamedMatch[1];
+              const alreadyNamed = new RegExp(`(^|\\n)\\s*export\\s*\\{[^}]*\\b${defName}\\b[^}]*\\}`,'m').test(contents);
+              if (!alreadyNamed) {
+                contents += `\n// Auto-added named re-export for preview compatibility\nexport { default as ${defName} };\n`;
+              }
+            }
+          }
+
+          return { contents, loader };
         }
         // Graceful fallback: don't crash the bundle — return a small safe module + emit a warning.
         // This prevents esbuild from failing hard on optional/missing files (we still surface warnings).
