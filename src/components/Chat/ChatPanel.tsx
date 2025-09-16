@@ -1,17 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, Project } from '../../types';
+import { ProjectTemplate } from '../../services/ProjectTemplates';
 import { Button } from '../ui/Button';
-import { Send, Mic, Bot, User } from 'lucide-react';
+import { Send, Mic, Bot, User, Sparkles, Zap } from 'lucide-react';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
   onSendMessage: (message: string) => void;
   currentProject: Project | null;
+  onCreateFromTemplate?: (templateId: string, projectName: string) => void;
+  availableTemplates?: ProjectTemplate[];
 }
 
-export function ChatPanel({ messages, onSendMessage, currentProject }: ChatPanelProps) {
+export function ChatPanel({ 
+  messages, 
+  onSendMessage, 
+  currentProject, 
+  onCreateFromTemplate,
+  availableTemplates = [] 
+}: ChatPanelProps) {
   const [inputValue, setInputValue] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -81,14 +91,52 @@ export function ChatPanel({ messages, onSendMessage, currentProject }: ChatPanel
     <div className="w-96 border-r border-border bg-card flex flex-col">
       {/* Chat Header */}
       <div className="p-4 border-b border-border">
-        <h3 className="font-semibold text-foreground flex items-center space-x-2">
-          <Bot className="w-5 h-5 text-primary" />
-          <span>AI Assistant</span>
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-foreground flex items-center space-x-2">
+            <Bot className="w-5 h-5 text-primary" />
+            <span>VisionStack AI</span>
+          </h3>
+          {availableTemplates.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="p-1"
+            >
+              <Sparkles className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
         {currentProject && (
           <p className="text-sm text-muted-foreground mt-1">
             Working on: {currentProject.name}
           </p>
+        )}
+        
+        {/* Template Quick Actions */}
+        {showTemplates && availableTemplates.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <p className="text-xs text-muted-foreground">Quick Start:</p>
+            {availableTemplates.slice(0, 3).map((template) => (
+              <Button
+                key={template.id}
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const projectName = prompt(`Enter project name for ${template.name}:`);
+                  if (projectName && onCreateFromTemplate) {
+                    onCreateFromTemplate(template.id, projectName);
+                  }
+                }}
+                className="w-full justify-start text-left h-auto p-2"
+              >
+                <div>
+                  <div className="font-medium text-xs">{template.name}</div>
+                  <div className="text-xs text-muted-foreground">{template.description}</div>
+                </div>
+              </Button>
+            ))}
+          </div>
         )}
       </div>
 
