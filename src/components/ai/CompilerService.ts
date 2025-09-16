@@ -123,11 +123,12 @@ export class CompilerService {
 
   private detectEntryPoint(files: Record<string, any>): string | null {
     const candidates = [
-      'index.html',
       'index.tsx',
       'index.ts',
       'index.jsx',
       'index.js',
+      'src/main.tsx',
+      'src/main.ts',
       'src/index.tsx',
       'src/index.ts',
       'src/index.jsx',
@@ -135,7 +136,9 @@ export class CompilerService {
       'App.tsx',
       'App.ts',
       'main.tsx',
-      'main.ts'
+      'main.ts',
+      // Fallback to plain HTML only if no script entry exists
+      'index.html'
     ];
 
     for (const candidate of candidates) {
@@ -160,6 +163,7 @@ export class CompilerService {
   }
 
   private createVirtualFilePlugin(virtualFS: Record<string, string>): esbuild.Plugin {
+    const self = this;
     return {
       name: 'virtual-fs',
       setup(build) {
@@ -170,7 +174,7 @@ export class CompilerService {
           
           // Handle relative imports
           if (args.path.startsWith('./') || args.path.startsWith('../')) {
-            const resolved = this.resolveRelativePath(args.importer, args.path);
+            const resolved = self.resolveRelativePath(args.importer, args.path);
             if (virtualFS[resolved]) {
               return { path: resolved, namespace: 'virtual' };
             }
@@ -192,8 +196,8 @@ export class CompilerService {
           if (content !== undefined) {
             return {
               contents: content,
-              loader: this.getLoader(args.path)
-            };
+              loader: self.getLoader(args.path)
+            } as esbuild.OnLoadResult;
           }
           return undefined;
         });
@@ -272,7 +276,7 @@ export class CompilerService {
 
   async generatePreviewHTML(project: Project): Promise<string> {
     const compilation = await this.compileProject(project, {
-      format: 'iife',
+      format: 'esm',
       minify: false,
       sourcemap: true
     });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Project } from '../../types';
 import { Button } from '../ui/Button';
 import { Play, Eye, Code, Terminal, Settings } from 'lucide-react';
@@ -10,13 +10,15 @@ interface EditorPanelProps {
   currentFile: string | null;
   onFileUpdate: (path: string, content: string) => void;
   onPreview: () => void;
+  onFileSelect: (filePath: string) => void;
 }
 
 export function EditorPanel({ 
   currentProject, 
   currentFile, 
   onFileUpdate, 
-  onPreview 
+  onPreview,
+  onFileSelect,
 }: EditorPanelProps) {
   const [activeTab, setActiveTab] = useState<'editor' | 'console' | 'settings'>('editor');
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
@@ -37,7 +39,6 @@ export function EditorPanel({
     setConsoleOutput(prev => [...prev, 'Starting build process...']);
     
     try {
-      // Here we would integrate with esbuild-wasm for actual compilation
       setConsoleOutput(prev => [...prev, 'Building project files...']);
       setConsoleOutput(prev => [...prev, 'Transpiling TypeScript/JSX...']);
       setConsoleOutput(prev => [...prev, 'Bundling dependencies...']);
@@ -48,6 +49,8 @@ export function EditorPanel({
       setConsoleOutput(prev => [...prev, `Build failed: ${error}`]);
     }
   };
+
+  const fileList = currentProject ? Object.keys(currentProject.files) : [];
 
   return (
     <div className="flex-1 flex flex-col bg-background">
@@ -87,8 +90,17 @@ export function EditorPanel({
           </div>
 
           {currentFile && (
-            <div className="text-sm text-muted-foreground">
-              {currentFile}
+            <div className="text-sm text-muted-foreground flex items-center space-x-2">
+              <span>File:</span>
+              <select
+                className="text-sm bg-background border border-input rounded px-2 py-1"
+                value={currentFile}
+                onChange={(e) => onFileSelect(e.target.value)}
+              >
+                {fileList.map((f) => (
+                  <option key={f} value={f}>{f}</option>
+                ))}
+              </select>
             </div>
           )}
         </div>

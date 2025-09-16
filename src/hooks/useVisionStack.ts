@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Project, ChatMessage, User, PuterUser, AppState } from '../types';
+import { getFileType } from '../lib/utils';
 
 // Custom hook to manage VisionStack application state
 export function useVisionStack() {
@@ -180,10 +181,20 @@ export function useVisionStack() {
   const updateFile = useCallback((path: string, content: string) => {
     if (!state.currentProject) return;
 
+    const prevFile = state.currentProject.files[path];
+
+    const baseFile = prevFile || {
+      path,
+      content: '',
+      type: getFileType(path) as any,
+      size: 0,
+      lastModified: new Date().toISOString(),
+    } as any;
+
     const updatedFiles = {
       ...state.currentProject.files,
       [path]: {
-        ...state.currentProject.files[path],
+        ...baseFile,
         content,
         lastModified: new Date().toISOString(),
         size: content.length

@@ -10,6 +10,7 @@ import {
   Tablet, 
   Smartphone 
 } from 'lucide-react';
+import { CompilerService } from '../ai/CompilerService';
 
 interface PreviewModalProps {
   project: Project | null;
@@ -32,14 +33,22 @@ export function PreviewModal({
     if (project) {
       generatePreview();
     }
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
   }, [project]);
 
   const generatePreview = async () => {
     if (!project) return;
 
     try {
-      // Generate HTML content with all files
-      const htmlContent = generatePreviewHTML(project);
+      let htmlContent = '';
+      if (hasAdvancedSources(project)) {
+        const compiler = CompilerService.getInstance();
+        htmlContent = await compiler.generatePreviewHTML(project);
+      } else {
+        htmlContent = generatePreviewHTML(project);
+      }
       const blob = new Blob([htmlContent], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       setPreviewUrl(url);
@@ -86,6 +95,11 @@ export function PreviewModal({
 
     return html;
   };
+
+  function hasAdvancedSources(project: Project): boolean {
+    return Object.keys(project.files).some((p) => /\.(ts|tsx|jsx)$/.test(p));
+  }
+
 
   const handleRefresh = () => {
     if (iframeRef.current) {

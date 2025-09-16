@@ -42,6 +42,7 @@ export function VisionStackApp() {
             currentFile={visionStack.currentFile}
             onFileUpdate={visionStack.updateFile}
             onPreview={() => setShowPreview(true)}
+            onFileSelect={visionStack.setCurrentFile}
           />
         </div>
       </main>
