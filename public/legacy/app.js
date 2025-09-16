@@ -2549,14 +2549,32 @@ export class App {
         // after rendering tree, refresh editor dropdowns
         this.populateEditorScriptSelect();
         this.populateConsoleScriptSelect();
+        
+        // Ensure dropdowns are properly initialized
+        setTimeout(() => {
+            this.populateEditorScriptSelect();
+            this.populateConsoleScriptSelect();
+        }, 100);
     }
 
     populateEditorScriptSelect() {
         const select = document.getElementById('editorScriptSelect');
-        if (!select) return;
+        if (!select) {
+            console.warn('editorScriptSelect element not found');
+            return;
+        }
         const prev = select.value;
         select.innerHTML = '';
         const files = Object.keys(this.currentFiles || {}).sort();
+        
+        if (files.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No files available';
+            select.appendChild(opt);
+            return;
+        }
+        
         files.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
@@ -2570,12 +2588,19 @@ export class App {
             select.value = prev;
         } else if (files.length > 0) {
             select.value = files[0];
+            // Update currentFile if nothing was selected
+            if (!this.currentFile) {
+                this.currentFile = files[0];
+            }
         }
     }
 
     populateConsoleScriptSelect() {
         const select = document.getElementById('consoleScriptSelect');
-        if (!select) return;
+        if (!select) {
+            console.warn('consoleScriptSelect element not found');
+            return;
+        }
         const prev = select.value;
         select.innerHTML = '';
         // Console targets: show JS, HTML and key config files to allow quick inspection
@@ -2584,19 +2609,27 @@ export class App {
             const ext = f.split('.').pop().toLowerCase();
             return preferredExts.includes(ext) || f.toLowerCase().includes('log') || f.toLowerCase().includes('config') || f.toLowerCase().includes('package.json');
         }).sort();
+        
+        if (files.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No console targets';
+            select.appendChild(opt);
+            return;
+        }
+        
         files.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f;
             opt.textContent = f;
             select.appendChild(opt);
         });
-        if (files.length === 0) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = 'No console targets';
-            select.appendChild(opt);
+        
+        if (prev && files.includes(prev)) {
+            select.value = prev;
+        } else if (files.length > 0) {
+            select.value = files[0];
         }
-        if (prev && files.includes(prev)) select.value = prev;
     }
 
     async loadDeploymentInfo() {

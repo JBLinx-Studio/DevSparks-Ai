@@ -168,11 +168,39 @@ export async function bundleSources(sources, entry, options = {}) {
       plugins: [ loaderPlugin(sources) ],
       logLevel: 'silent',
       loader: { '.ts': 'ts', '.tsx': 'tsx', '.js': 'js', '.jsx': 'jsx', '.css': 'css', '.json': 'json' },
-      target: ['es2020']
+      target: ['es2020'],
+      // Enable CSS bundling for in-memory builds
+      outdir: 'out', // Required for CSS bundling even when write: false
+      splitting: false,
+      // Bundle CSS into JS when write: false
+      inject: []
     });
 
-    // result.outputFiles[0].text contains the bundled code
-    const code = result.outputFiles && result.outputFiles[0] ? result.outputFiles[0].text : '';
+    // result.outputFiles contains bundled code and potentially CSS
+    let code = '';
+    let cssContent = '';
+    
+    if (result.outputFiles && result.outputFiles.length > 0) {
+      // Find JS and CSS output files
+      const jsFile = result.outputFiles.find(f => f.path.endsWith('.js'));
+      const cssFile = result.outputFiles.find(f => f.path.endsWith('.css'));
+      
+      code = jsFile ? jsFile.text : '';
+      cssContent = cssFile ? cssFile.text : '';
+      
+      // If CSS content exists, inject it into the JS bundle
+      if (cssContent) {
+        const cssInjection = `
+// Auto-injected CSS from bundling
+const css = \`${cssContent.replace(/`/g, '\\`')}\`;
+const style = document.createElement('style');
+style.textContent = css;
+document.head.appendChild(style);
+`;
+        code = cssInjection + '\n' + code;
+      }
+    }
+    
     // Optionally format diagnostics into text strings for better console visibility
     const formatDiag = (d) => {
       if (!d) return '';
