@@ -1,11 +1,12 @@
 {
-  "name": "devsparks-ai",
+  "name": "visionstack",
   "private": true,
   "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:dev": "vite build --mode development",
     "preview": "vite preview --port 8080"
   },
   "dependencies": {
