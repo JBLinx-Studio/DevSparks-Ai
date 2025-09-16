@@ -219,24 +219,9 @@ export class App {
             window.addEventListener('puter:signin', (event) => {
                 this.puterUser = event.detail;
                 this.puterEnabled = true;
+                this.addConsoleMessage('success', `Successfully signed in to Puter.AI as ${this.puterUser.username || this.puterUser.id}`);
                 this.updatePuterStatusUI();
                 this.updateAccountInfoUI();
-
-                // Auto-switch AI to Puter GPT-5 and refresh UI + selector badge
-                this.selectAIProvider('puter:gpt-5');
-                try { window.setPreferredModel?.('puter:gpt-5'); window.pickModel?.('puter:gpt-5'); } catch {}
-
-                // Update Options modal Puter section
-                try {
-                    const s = document.getElementById('puterAccountStatus');
-                    const d = document.getElementById('puterAccountDetails');
-                    const btnIn = document.getElementById('puterOptionsSignInBtn');
-                    const btnOut = document.getElementById('puterOptionsSignOutBtn');
-                    if (s) s.textContent = `Puter: Connected — ${this.puterUser.username || this.puterUser.id}`;
-                    if (btnIn) btnIn.style.display = 'none';
-                    if (btnOut) btnOut.style.display = '';
-                    if (d) { d.style.display = 'block'; d.textContent = JSON.stringify({ whoami: this.puterUser }, null, 2); }
-                } catch {}
             });
             
             window.addEventListener('puter:signout', () => {
@@ -410,35 +395,6 @@ export class App {
 
         document.getElementById('optionsBtn').addEventListener('click', () => this.showOptionsModal());
         document.getElementById('closeOptionsModal').addEventListener('click', () => this.hideOptionsModal());
-
-        // Puter options actions
-        document.getElementById('puterOptionsSignInBtn')?.addEventListener('click', () => this.showPuterSignIn());
-        document.getElementById('puterOptionsSignOutBtn')?.addEventListener('click', async () => {
-            try { await (window.lovablePuter?.signOut?.() || window.Puter?.auth?.signOut?.()); } catch {}
-            this.puterUser = null;
-            this.puterEnabled = false;
-            this.updatePuterStatusUI();
-            this.updateAIProviderControlsUI();
-            try {
-                const s = document.getElementById('puterAccountStatus');
-                const d = document.getElementById('puterAccountDetails');
-                const btnIn = document.getElementById('puterOptionsSignInBtn');
-                const btnOut = document.getElementById('puterOptionsSignOutBtn');
-                if (s) s.textContent = 'Puter: Not connected';
-                if (btnIn) btnIn.style.display = '';
-                if (btnOut) btnOut.style.display = 'none';
-                if (d) { d.style.display = 'none'; d.textContent = ''; }
-            } catch {}
-        });
-        document.getElementById('puterOptionsStorageInfoBtn')?.addEventListener('click', async () => {
-            try {
-                const info = await window.PuterShim?.getStorageInfo?.();
-                const d = document.getElementById('puterAccountDetails');
-                if (d) { d.style.display = 'block'; d.textContent = JSON.stringify(info || {}, null, 2); }
-            } catch (e) {
-                this.addConsoleMessage('warn', 'Failed to fetch Puter storage info');
-            }
-        });
 
         document.getElementById('mainPanelTabs').addEventListener('click', (e) => {
             if (e.target.classList.contains('panel-tab')) {
@@ -1829,31 +1785,20 @@ export class App {
         const aiProviderSelect = document.getElementById('aiProviderSelect');
         const aiApiKeyInput = document.getElementById('aiApiKeyInput');
 
-        // When signed into Puter, only show Puter providers and auto-select GPT-5
-        const providers = this.puterEnabled
-            ? this.availableAIProviders.filter(p => p.id.startsWith('puter:'))
-            : this.availableAIProviders;
-
         if (aiProviderSelect) {
             aiProviderSelect.innerHTML = '';
-            providers.forEach(provider => {
+            this.availableAIProviders.forEach(provider => {
                 const option = document.createElement('option');
                 option.value = provider.id;
                 option.textContent = provider.name;
                 aiProviderSelect.appendChild(option);
             });
-            // Auto-switch when Puter becomes available
-            if (this.puterEnabled && (!this.aiProvider || !this.aiProvider.startsWith('puter:'))) {
-                this.aiProvider = 'puter:gpt-5';
-                this.saveAIPreferences();
-                try { window.setPreferredModel?.('puter:gpt-5'); window.pickModel?.('puter:gpt-5'); } catch {}
-            }
             aiProviderSelect.value = this.aiProvider;
         }
 
         if (aiApiKeyInput) {
-            aiApiKeyInput.disabled = (!this.aiProvider || this.aiProvider.startsWith('websim'));
-            if (!this.aiProvider || this.aiProvider.startsWith('websim')) {
+            aiApiKeyInput.disabled = (this.aiProvider === 'websim');
+            if (this.aiProvider === 'websim') {
                 aiApiKeyInput.value = '';
                 aiApiKeyInput.placeholder = 'Not applicable for Websim AI (Free)';
             } else {
