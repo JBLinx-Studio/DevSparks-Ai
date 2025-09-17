@@ -27,6 +27,16 @@ export class App {
         this.currentUser = null;
         this.speechEnabled = JSON.parse(localStorage.getItem('speechEnabled') || 'true');
         this.voicePreference = localStorage.getItem('voicePreference') || 'en-female';
+        
+        // Theme management
+        this.currentTheme = localStorage.getItem('theme') || 'light';
+        this.initializeTheme();
+
+        this.puterEnabled = false;
+        this.puterUser = null;
+        this.currentUser = null;
+        this.speechEnabled = JSON.parse(localStorage.getItem('speechEnabled') || 'true');
+        this.voicePreference = localStorage.getItem('voicePreference') || 'en-female';
         this.availableVoices = [
             { id: "en-female", name: "English (Female)" },
             { id: "en-male", name: "English (Male)" },
@@ -94,6 +104,7 @@ export class App {
         this.switchMainPanel(this.currentMainPanel);
         this.updateSpeechControlsUI();
         this.githubManager.checkGithubConnection();
+        this.updateThemeUI();
 
         this.initCurrentUser().then(() => {
             this.initPuterStorage().then(() => {
@@ -235,6 +246,35 @@ export class App {
         this.updatePuterStatusUI();
     }
 
+    initializeTheme() {
+        // Apply the current theme to document
+        document.documentElement.setAttribute('data-theme', this.currentTheme);
+    }
+
+    toggleTheme() {
+        this.currentTheme = this.currentTheme === 'light' ? 'dark' : 'light';
+        localStorage.setItem('theme', this.currentTheme);
+        document.documentElement.setAttribute('data-theme', this.currentTheme);
+        this.updateThemeUI();
+        this.addConsoleMessage('info', `Switched to ${this.currentTheme} theme`);
+    }
+
+    updateThemeUI() {
+        const themeToggle = document.getElementById('themeToggle');
+        const themeText = document.getElementById('themeText');
+        const themeIcon = themeToggle?.querySelector('svg path');
+        
+        if (themeText && themeIcon) {
+            if (this.currentTheme === 'dark') {
+                themeText.textContent = 'Light';
+                themeIcon.setAttribute('d', 'M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8z');
+            } else {
+                themeText.textContent = 'Dark';
+                themeIcon.setAttribute('d', 'M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z');
+            }
+        }
+    }
+
     updatePuterStatusUI() {
         const statusDiv = document.getElementById('cloudStorageStatus');
         if (statusDiv) {
@@ -253,6 +293,9 @@ export class App {
     setupEventListeners() {
         this.imagePreviewOverlay = document.getElementById('imagePreviewOverlay');
         this.videoPreviewOverlay = document.getElementById('videoPreviewOverlay');
+
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
 
         document.getElementById('sendBtn').addEventListener('click', () => this.chatManager.sendMessage());
         document.getElementById('messageInput').addEventListener('keypress', (e) => {
@@ -2435,6 +2478,124 @@ export class App {
 
             const { owner, name } = this.githubManager.currentRepoInfo;
             addLogEntry(`Configuring GitHub Pages for ${owner}/${name}...`);
+
+            // Step 1: Get repository information
+            let repoResponse = await fetch(`https://api.github.com/repos/${owner}/${name}`, {
+                headers: {
+                    'Authorization': `token ${this.githubManager.githubToken}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+
+            if (!repoResponse.ok) {
+                throw new Error(`Failed to fetch repository: ${repoResponse.statusText}`);
+            }
+
+            const repoData = await repoResponse.json();
+            addLogEntry('Repository information retrieved');
+
+            // Step 2: Check if gh-pages branch exists
+            let branchExists = false;
+            try {
+                const branchResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/branches/gh-pages`, {
+                    headers: {
+                        'Authorization': `token ${this.githubManager.githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                branchExists = branchResponse.ok;
+            } catch (error) {
+                // Branch doesn't exist, we'll create it
+            }
+
+            if (!branchExists) {
+                addLogEntry('Creating gh-pages branch...');
+                
+                // Get the default branch SHA
+                const defaultBranch = repoData.default_branch;
+                const branchRefResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/git/refs/heads/${defaultBranch}`, {
+                    headers: {
+                        'Authorization': `token ${this.githubManager.githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                const branchRef = await branchRefResponse.json();
+                const baseSha = branchRef.object.sha;
+
+                // Create gh-pages branch
+                await fetch(`https://api.github.com/repos/${owner}/${name}/git/refs`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${this.githubManager.githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        ref: 'refs/heads/gh-pages',
+                        sha: baseSha
+                    })
+                });
+
+                addLogEntry('gh-pages branch created successfully');
+            } else {
+                addLogEntry('gh-pages branch already exists');
+            }
+
+            // Step 3: Upload project files to gh-pages branch
+            addLogEntry('Uploading project files to gh-pages...');
+            
+            const filesToUpload = Object.entries(this.currentFiles);
+            for (const [filename, content] of filesToUpload) {
+                await this.githubManager.uploadFile(owner, name, filename, content, 'gh-pages');
+                addLogEntry(`Uploaded: ${filename}`);
+            }
+
+            // Step 4: Enable GitHub Pages
+            addLogEntry('Enabling GitHub Pages...');
+            
+            const pagesResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/pages`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `token ${this.githubManager.githubToken}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    source: {
+                        branch: 'gh-pages',
+                        path: '/'
+                    }
+                })
+            });
+
+            let pagesData;
+            if (pagesResponse.status === 201) {
+                pagesData = await pagesResponse.json();
+                addLogEntry('GitHub Pages enabled successfully');
+            } else if (pagesResponse.status === 409) {
+                // Pages already enabled, get existing configuration
+                const existingPagesResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/pages`, {
+                    headers: {
+                        'Authorization': `token ${this.githubManager.githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                pagesData = await existingPagesResponse.json();
+                addLogEntry('GitHub Pages was already enabled');
+            } else {
+                throw new Error(`Failed to enable Pages: ${pagesResponse.statusText}`);
+            }
+
+            // Step 5: Display success and URL
+            const pagesUrl = pagesData.html_url || `https://${owner}.github.io/${name}`;
+            addLogEntry(`Deployment completed successfully!`, 'success');
+            addLogEntry(`Your site is available at: ${pagesUrl}`, 'success');
+            
+            deploymentStatusSpan.textContent = 'Deployed Successfully';
+            deploymentStatusSpan.style.color = 'var(--color-success-text)';
+            lastDeployedDateSpan.textContent = new Date().toLocaleString();
+            pagesUrlSpan.innerHTML = `<a href="${pagesUrl}" target="_blank" style="color: var(--color-primary); text-decoration: none;">${pagesUrl}</a>`;
 
             // Enable GitHub Pages on the repository
             const enablePagesResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/pages`, {
