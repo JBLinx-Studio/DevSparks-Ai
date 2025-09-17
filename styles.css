@@ -62,9 +62,6 @@
     --color-bg-tertiary: #2d2e3a; /* Darker headers/inputs */
 
     --color-border: rgba(255,255,255,0.1); /* Subtle light borders on dark */
-    /* Ensure sketch surfaces respect dark mode */
-    --color-paper: var(--color-bg-primary);
-    --color-ink: var(--color-text-primary);
 }
 
 /* Aliases to unify legacy color tokens with the new theme system */
@@ -2477,15 +2474,13 @@ html, body, .sidebar, .chat-messages, .console-output,
 }
 
 /* Apply sketch to many core components */
-/* Limit sketch effect to explicit surfaces to avoid overriding theme backgrounds */
-.sketch-surface {
+.header, .sidebar, .chat-panel, .editor-panel, .preview-content, .modal-content, .image-preview-content, .video-preview-content {
     background: var(--color-paper);
     color: var(--color-text-dark);
     border: 1px solid var(--color-border);
     box-shadow: var(--shadow-md);
     border-radius: 0; /* square */
 }
-
 
 /* Slightly roughen code blocks borders to match sketch style */
 .message-content pre, .devlog-code, .code-editor textarea {
