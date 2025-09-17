@@ -11,33 +11,16 @@
     /* @tweakable [background / paper color for sketch effect] */ --color-paper: #ffffff;
     /* @tweakable [ink color for strokes] */ --color-ink: #000000;
     /* @tweakable [muted ink for lighter text] */ --color-ink-muted: #6b6b6b;
-}
 
-/* Light theme (default) */
-:root {
-    --color-text-primary: #1f2937; /* Dark text for light backgrounds */
-    --color-text-secondary: #6b7280; /* Medium gray text */
-    --color-text-muted: #9ca3af; /* Lighter gray text */
+    --color-text-dark: #e5e7eb; /* Light text for contrast on dark bg */
+    --color-text-medium: #9ca3af; /* Medium gray text */
+    --color-text-muted: #6b7280;
 
-    --color-bg-primary: #ffffff; /* Light backgrounds */
-    --color-bg-secondary: #f9fafb; /* Light panels */
-    --color-bg-tertiary: #f3f4f6; /* Darker input/header areas */
-
-    --color-border: rgba(0,0,0,0.1); /* Subtle dark borders on light */
-}
-
-/* Dark theme */
-[data-theme="dark"] {
-    --color-text-primary: #e5e7eb; /* Light text for dark backgrounds */
-    --color-text-secondary: #9ca3af; /* Medium gray text */
-    --color-text-muted: #6b7280; /* Darker gray text */
-
-    --color-bg-primary: #1a1b23; /* Dark IDE background */
-    --color-bg-secondary: #252730; /* Dark panels and secondary backgrounds */
-    --color-bg-tertiary: #2d2e3a; /* Darker headers/inputs */
+    --color-bg-light: #1a1b23; /* Dark IDE background */
+    --color-bg-medium: #252730; /* Dark panels and secondary backgrounds */
+    --color-bg-dark: #2d2e3a; /* Darker headers/inputs */
 
     --color-border: rgba(255,255,255,0.1); /* Subtle light borders on dark */
-}
     
     --color-success-bg: #10B981; /* Green-500 */
     --color-success-text: #ffffff; /* Green-50 */
@@ -73,13 +56,12 @@
 
 body {
     font-family: 'Inter', sans-serif; /* Simplified font stack */
-    background: var(--color-bg-primary);
-    color: var(--color-text-primary);
+    background: var(--color-bg-light);
+    color: var(--color-text-dark);
     height: 100vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Scrollbar styles for WebKit browsers (Chrome, Safari, Edge) */
@@ -89,14 +71,14 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--color-bg-primary); /* Background of the scrollbar track */
+    background: var(--color-bg-light); /* Background of the scrollbar track */
     border-radius: 0; /* Square corners */
 }
 
 ::-webkit-scrollbar-thumb {
     background: var(--color-border); /* Color of the scrollbar thumb */
     border-radius: 0; /* Square corners */
-    border: 1px solid var(--color-bg-secondary); /* Small border to separate from track */
+    border: 1px solid var(--color-bg-medium); /* Small border to separate from track */
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -111,7 +93,7 @@ html, body, .sidebar, .chat-messages, .console-output,
 .code-editor textarea, .custom-modal-body, .custom-prompt-input,
 .image-preview-content, .video-preview-content, .deploy-section {
     scrollbar-width: thin; /* "auto" or "thin" */
-    scrollbar-color: var(--color-border) var(--color-bg-primary); /* thumb-color track-color */
+    scrollbar-color: var(--color-border) var(--color-bg-light); /* thumb-color track-color */
 }
 
 .app-container {
@@ -123,12 +105,11 @@ html, body, .sidebar, .chat-messages, .console-output,
 
 .header {
     /* Stylized header with gradient matching new theme */
-    background: linear-gradient(90deg, var(--color-bg-tertiary) 0%, var(--color-bg-secondary) 100%);
+    background: linear-gradient(90deg, var(--color-bg-dark) 0%, var(--color-bg-medium) 100%);
     border-bottom: 1px solid var(--color-border);
     padding: var(--spacing-md) var(--spacing-xl);
     box-shadow: var(--shadow-sm);
     flex-shrink: 0;
-    transition: background 0.3s ease;
 }
 
 .header-content {
@@ -141,34 +122,12 @@ html, body, .sidebar, .chat-messages, .console-output,
     font-family: 'Inter', sans-serif; /* Changed logo font to Inter for consistency */
     font-size: 24px;
     font-weight: 700;
-    color: var(--color-text-primary); /* Logo color changed to text-primary for consistency */
+    color: var(--color-text-dark); /* Logo color changed to text-dark for consistency */
 }
 
 .header-actions {
     display: flex;
     gap: var(--spacing-md);
-    align-items: center;
-}
-
-/* Theme Toggle Button */
-.theme-toggle {
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: 1px solid var(--color-border);
-    border-radius: 0;
-    background: var(--color-bg-secondary);
-    color: var(--color-text-primary);
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    transition: all 0.2s ease;
-}
-
-.theme-toggle:hover {
-    background: var(--color-bg-tertiary);
-    transform: translateY(-1px);
 }
 
 .btn {
@@ -184,8 +143,8 @@ html, body, .sidebar, .chat-messages, .console-output,
     transition: all 0.2s ease;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--color-border);
-    background: var(--color-bg-primary);
-    color: var(--color-text-primary);
+    background: var(--color-bg-light);
+    color: var(--color-text-dark);
 }
 
 /* Primary button accent */
@@ -203,13 +162,13 @@ html, body, .sidebar, .chat-messages, .console-output,
 }
 
 .btn-secondary {
-    background: var(--color-bg-secondary);
-    color: var(--color-text-primary);
+    background: var(--color-bg-dark);
+    color: var(--color-text-dark);
     border: 1px solid var(--color-border);
 }
 
 .btn-secondary:hover {
-    background: var(--color-bg-tertiary);
+    background: var(--color-bg-medium);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
@@ -274,7 +233,7 @@ html, body, .sidebar, .chat-messages, .console-output,
     font-size: 16px;
     font-weight: 600;
     margin-bottom: var(--spacing-lg);
-    color: var(--color-text-primary);
+    color: var(--color-text-dark);
     width: 100%; /* Make header take full width */
     flex-shrink: 0; /* Prevent header from shrinking when buttons wrap */
 }
@@ -287,8 +246,8 @@ html, body, .sidebar, .chat-messages, .console-output,
     font-size: 14px;
     font-weight: 500;
     text-align: center;
-    background: var(--color-bg-primary); /* Use primary background */
-    color: var(--color-text-secondary); /* Secondary text */
+    background: var(--color-bg-light); /* Dark background */
+    color: var(--color-text-medium); /* Light text */
     border: 1px solid var(--color-border);
 }
 

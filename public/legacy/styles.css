@@ -11,33 +11,16 @@
     /* @tweakable [background / paper color for sketch effect] */ --color-paper: #ffffff;
     /* @tweakable [ink color for strokes] */ --color-ink: #000000;
     /* @tweakable [muted ink for lighter text] */ --color-ink-muted: #6b6b6b;
-}
 
-/* Light theme (default) */
-:root {
-    --color-text-primary: #1f2937; /* Dark text for light backgrounds */
-    --color-text-secondary: #6b7280; /* Medium gray text */
-    --color-text-muted: #9ca3af; /* Lighter gray text */
+    --color-text-dark: #e5e7eb; /* Light text for contrast on dark bg */
+    --color-text-medium: #9ca3af; /* Medium gray text */
+    --color-text-muted: #6b7280;
 
-    --color-bg-primary: #ffffff; /* Light backgrounds */
-    --color-bg-secondary: #f9fafb; /* Light panels */
-    --color-bg-tertiary: #f3f4f6; /* Darker input/header areas */
-
-    --color-border: rgba(0,0,0,0.1); /* Subtle dark borders on light */
-}
-
-/* Dark theme */
-[data-theme="dark"] {
-    --color-text-primary: #e5e7eb; /* Light text for dark backgrounds */
-    --color-text-secondary: #9ca3af; /* Medium gray text */
-    --color-text-muted: #6b7280; /* Darker gray text */
-
-    --color-bg-primary: #1a1b23; /* Dark IDE background */
-    --color-bg-secondary: #252730; /* Dark panels and secondary backgrounds */
-    --color-bg-tertiary: #2d2e3a; /* Darker headers/inputs */
+    --color-bg-light: #1a1b23; /* Dark IDE background */
+    --color-bg-medium: #252730; /* Dark panels and secondary backgrounds */
+    --color-bg-dark: #2d2e3a; /* Darker headers/inputs */
 
     --color-border: rgba(255,255,255,0.1); /* Subtle light borders on dark */
-}
     
     --color-success-bg: #10B981; /* Green-500 */
     --color-success-text: #ffffff; /* Green-50 */
@@ -79,13 +62,12 @@
 
 body {
     font-family: 'Inter', sans-serif; /* Simplified font stack */
-    background: var(--color-bg-primary);
-    color: var(--color-text-primary);
+    background: var(--color-bg-light);
+    color: var(--color-text-dark);
     height: 100vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Scrollbar styles for WebKit browsers (Chrome, Safari, Edge) */
