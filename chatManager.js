@@ -592,37 +592,41 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
 
             // Puter routing: support multiple surfaces (PuterService, Puter, PuterAPI)
             if (backend === 'puter') {
-                // Prefer PuterService if present - route to specific models
+                // Build model variants for robust compatibility across Puter surfaces
+                const getVariants = (m) => {
+                    if (m === 'openai') return ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
+                    if (m === 'claude-35-sonnet') return ['claude-3-5-sonnet-20240620', 'claude-3-5-sonnet-20241022', 'claude-3-5-sonnet'];
+                    if (m === 'deepseek') return ['deepseek-chat', 'deepseek-reasoner'];
+                    return [m || 'gpt-4o-mini'];
+                };
+                const variants = getVariants(model);
+
+                // Helper to try a list of models against a given chat function
+                const trySurface = async (chatFn) => {
+                    for (const mv of variants) {
+                        try {
+                            const opts = { model: mv, messages: payload.messages, json: payload.json };
+                            const res = await chatFn(opts);
+                            if (res) return res;
+                        } catch (_) { /* try next variant */ }
+                    }
+                    return null;
+                };
+
+                // Prefer PuterService
                 if (window.PuterService?.ai?.chat) {
-                    let puterModel = model || 'gpt-4o-mini'; // Default
-                    
-                    // Map our unified model IDs to actual Puter model names  
-                    if (model === 'openai') puterModel = 'gpt-4o-mini';
-                    else if (model === 'claude-35-sonnet') puterModel = 'claude-3-5-sonnet-20241022';
-                    else if (model === 'deepseek') puterModel = 'deepseek-chat';
-                    
-                    const opts = { model: puterModel, messages: payload.messages, json: payload.json };
-                    return await window.PuterService.ai.chat(opts);
+                    const res = await trySurface(window.PuterService.ai.chat);
+                    if (res) return res;
                 }
                 // Fallback to Puter SDK directly
                 if (window.Puter?.ai?.chat) {
-                    let puterModel = model || 'gpt-4o-mini';
-                    if (model === 'openai') puterModel = 'gpt-4o-mini';
-                    else if (model === 'claude-35-sonnet') puterModel = 'claude-3-5-sonnet-20241022';
-                    else if (model === 'deepseek') puterModel = 'deepseek-chat';
-                    
-                    const opts = { model: puterModel, messages: payload.messages, json: payload.json };
-                    return await window.Puter.ai.chat(opts);
+                    const res = await trySurface(window.Puter.ai.chat);
+                    if (res) return res;
                 }
                 // Fallback to PuterAPI shim
                 if (window.PuterAPI?.ai?.chat) {
-                    let puterModel = model || 'gpt-4o-mini';
-                    if (model === 'openai') puterModel = 'gpt-4o-mini';
-                    else if (model === 'claude-35-sonnet') puterModel = 'claude-3-5-sonnet-20241022';
-                    else if (model === 'deepseek') puterModel = 'deepseek-chat';
-                    
-                    const opts = { model: puterModel, messages: payload.messages, json: payload.json };
-                    return await window.PuterAPI.ai.chat(opts);
+                    const res = await trySurface(window.PuterAPI.ai.chat);
+                    if (res) return res;
                 }
             }
 

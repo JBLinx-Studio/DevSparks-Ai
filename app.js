@@ -645,10 +645,6 @@ export class App {
         if (speechToggle) speechToggle.addEventListener('change', (e) => this.toggleSpeech(e.target.checked));
         if (voiceSelect) voiceSelect.addEventListener('change', (e) => this.selectVoice(e.target.value));
 
-        const aiProviderSelect = document.getElementById('aiProviderSelect');
-        const aiApiKeyInput = document.getElementById('aiApiKeyInput');
-        if (aiProviderSelect) aiProviderSelect.addEventListener('change', (e) => this.selectAIProvider(e.target.value));
-        if (aiApiKeyInput) aiApiKeyInput.addEventListener('input', (e) => this.setAIApiKey(e.target.value));
 
         // Reasonings panel controls
         const reasoningSelect = document.getElementById('reasoningModeSelect');
@@ -1802,7 +1798,6 @@ export class App {
         if (modal) {
             modal.style.display = 'flex';
             this.updateSpeechControlsUI();
-            this.updateAIProviderControlsUI();
             this.updateAccountInfoUI();
         }
     }

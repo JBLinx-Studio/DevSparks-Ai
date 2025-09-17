@@ -205,9 +205,6 @@ function createSelector() {
     }
   });
 
-  // Remove custom model functionality to keep it clean and simple
-  addBtn.style.display = 'none';
-
   // keyboard: open with Alt+M, cycle with arrow keys when open
   document.addEventListener('keydown', (e)=> {
     if (e.altKey && (e.key === 'm' || e.key === 'M')) { e.preventDefault(); currentBadge.click(); }
