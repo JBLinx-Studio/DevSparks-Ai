@@ -9,7 +9,7 @@
     <!-- Puter.js SDK (required by Puter integration) -->
     <script src="https://js.puter.com/v2/"></script>
     <!-- Puter quick initializer: auto-check sign-in, show click-to-sign-in banner, expose testing helpers -->
-    <!-- Removed duplicate Puter quick initializer to avoid double sign-in -->
+    <script type="module" src="puter-init.js"></script>
 
     <!-- Monaco loader (AMD) for the in-browser Monaco Editor -->
     <script src="https://unpkg.com/monaco-editor@0.39.0/min/vs/loader.js"></script>
@@ -46,8 +46,8 @@
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                   </button>
 
-  <!-- dropdown menu (initially hidden) - solid background, high z-index, proper contrast and alignment -->
-  <div id="ai-model-menu" role="listbox" aria-label="AI model list" style="display:none;position:absolute;top:46px;left:0;min-width:280px;background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10000;padding:8px;transform: translateX(0);">
+  <!-- dropdown menu (initially hidden) - solid background, high z-index, proper contrast -->
+  <div id="ai-model-menu" role="listbox" aria-label="AI model list" style="display:none;position:absolute;top:46px;left:0;min-width:280px;background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10000;padding:8px;">
     <!-- populated by script -->
   </div>
                 </div>
@@ -511,6 +511,16 @@
     </script>
 
     <!-- Add Lovable-friendly import maps and prefer ES modules (no other changes) -->
+    <script type="module">
+      // Ensure the new TypeScript-built integration is loaded (Vite will map /src)
+      import puter from '/src/integrations/puter/puter_integration.ts';
+      // Expose a simple helper for the UI
+      window.lovablePuter = puter;
+      // Refresh UI badge if present
+      document.addEventListener('DOMContentLoaded', () => {
+        try { document.getElementById('puterInfoBtn')?.addEventListener('click', () => puter.runDiagnostics().then(r => console.info('Puter diagnostics', r))); } catch(e) {}
+      });
+    </script>
 
     <script type="module">
       // Optional: Initialize any demo components if needed
