@@ -247,8 +247,14 @@ export class App {
     }
 
     initializeTheme() {
-        // Apply the current theme to document
-        document.documentElement.setAttribute('data-theme', this.currentTheme);
+        // Apply the current theme to document - wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                document.documentElement.setAttribute('data-theme', this.currentTheme);
+            });
+        } else {
+            document.documentElement.setAttribute('data-theme', this.currentTheme);
+        }
     }
 
     toggleTheme() {
@@ -257,6 +263,7 @@ export class App {
         document.documentElement.setAttribute('data-theme', this.currentTheme);
         this.updateThemeUI();
         this.addConsoleMessage('info', `Switched to ${this.currentTheme} theme`);
+        console.log('Theme toggled to:', this.currentTheme); // Debug log
     }
 
     updateThemeUI() {
@@ -294,8 +301,11 @@ export class App {
         this.imagePreviewOverlay = document.getElementById('imagePreviewOverlay');
         this.videoPreviewOverlay = document.getElementById('videoPreviewOverlay');
 
-        // Theme toggle
-        document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
+        // Theme toggle - add null check to prevent errors
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => this.toggleTheme());
+        }
 
         document.getElementById('sendBtn').addEventListener('click', () => this.chatManager.sendMessage());
         document.getElementById('messageInput').addEventListener('keypress', (e) => {
@@ -307,56 +317,126 @@ export class App {
 
         document.getElementById('newProjectBtn').addEventListener('click', () => this.createNewProject());
 
-        document.getElementById('githubBtn').addEventListener('click', () => this.githubManager.showGithubModal());
-        document.getElementById('connectGithubBtn').addEventListener('click', () => this.githubManager.connectGithub());
-        document.getElementById('syncBtn').addEventListener('click', () => this.githubManager.syncToGithub());
+        const githubBtn = document.getElementById('githubBtn');
+        if (githubBtn) {
+            githubBtn.addEventListener('click', () => this.githubManager.showGithubModal());
+        }
+        
+        const connectGithubBtn = document.getElementById('connectGithubBtn');
+        if (connectGithubBtn) {
+            connectGithubBtn.addEventListener('click', () => this.githubManager.connectGithub());
+        }
+        
+        const syncBtn = document.getElementById('syncBtn');
+        if (syncBtn) {
+            syncBtn.addEventListener('click', () => this.githubManager.syncToGithub());
+        }
         // Small, non-breaking enhancement: create a local checkpoint snapshot for the current project
-        document.getElementById('checkpointBtn')?.addEventListener('click', () => this.createCheckpoint());
+        const checkpointBtn = document.getElementById('checkpointBtn');
+        if (checkpointBtn) {
+            checkpointBtn.addEventListener('click', () => this.createCheckpoint());
+        }
 
-        document.getElementById('previewBtn').addEventListener('click', () => this.previewManager.showPreview());
+        const previewBtn = document.getElementById('previewBtn');
+        if (previewBtn) {
+            previewBtn.addEventListener('click', () => this.previewManager.showPreview());
+        }
         // New: build & preview button triggers a (safe) in-browser build pipeline
         /* @tweakable [Label for the build button shown inside the Preview modal] */
         this.buildButtonLabel = 'Build & Compile';
         // Wire Build button inside the Preview modal to trigger an in-browser compile/bundle
-        document.getElementById('buildCompileBtn')?.addEventListener('click', () => this.previewManager.buildAndPreview());
+        const buildCompileBtn = document.getElementById('buildCompileBtn');
+        if (buildCompileBtn) {
+            buildCompileBtn.addEventListener('click', () => this.previewManager.buildAndPreview());
+        }
+        
         // Keep the legacy hidden button in-place for backward compatibility but update its text (hidden)
         const legacyBuildBtn = document.getElementById('buildPreviewBtn');
-        if (legacyBuildBtn) { legacyBuildBtn.textContent = this.buildButtonLabel; legacyBuildBtn.title = this.buildButtonLabel; }
+        if (legacyBuildBtn) { 
+            legacyBuildBtn.textContent = this.buildButtonLabel; 
+            legacyBuildBtn.title = this.buildButtonLabel; 
+        }
 
-        document.getElementById('closePreviewBtn').addEventListener('click', () => this.previewManager.hidePreview());
+        const closePreviewBtn = document.getElementById('closePreviewBtn');
+        if (closePreviewBtn) {
+            closePreviewBtn.addEventListener('click', () => this.previewManager.hidePreview());
+        }
 
-        document.getElementById('refreshPreviewBtn').addEventListener('click', () => this.refreshPreview());
-        document.getElementById('openNewWindowBtn').addEventListener('click', () => this.openPreviewInNewWindow());
-        document.getElementById('fullscreenPreviewBtn').addEventListener('click', () => this.toggleFullscreenPreview());
+        const refreshPreviewBtn = document.getElementById('refreshPreviewBtn');
+        if (refreshPreviewBtn) {
+            refreshPreviewBtn.addEventListener('click', () => this.refreshPreview());
+        }
+        
+        const openNewWindowBtn = document.getElementById('openNewWindowBtn');
+        if (openNewWindowBtn) {
+            openNewWindowBtn.addEventListener('click', () => this.openPreviewInNewWindow());
+        }
+        
+        const fullscreenPreviewBtn = document.getElementById('fullscreenPreviewBtn');
+        if (fullscreenPreviewBtn) {
+            fullscreenPreviewBtn.addEventListener('click', () => this.toggleFullscreenPreview());
+        }
 
-        document.getElementById('desktopPreviewBtn').addEventListener('click', () => this.previewManager.setPreviewMode('desktop'));
-        document.getElementById('tabletPreviewBtn').addEventListener('click', () => this.previewManager.setPreviewMode('tablet'));
-        document.getElementById('mobilePreviewBtn').addEventListener('click', () => this.previewManager.setPreviewMode('mobile'));
+        const desktopPreviewBtn = document.getElementById('desktopPreviewBtn');
+        const tabletPreviewBtn = document.getElementById('tabletPreviewBtn');
+        const mobilePreviewBtn = document.getElementById('mobilePreviewBtn');
+        
+        if (desktopPreviewBtn) {
+            desktopPreviewBtn.addEventListener('click', () => this.previewManager.setPreviewMode('desktop'));
+        }
+        if (tabletPreviewBtn) {
+            tabletPreviewBtn.addEventListener('click', () => this.previewManager.setPreviewMode('tablet'));
+        }
+        if (mobilePreviewBtn) {
+            mobilePreviewBtn.addEventListener('click', () => this.previewManager.setPreviewMode('mobile'));
+        }
 
-        document.getElementById('closeGithubModal').addEventListener('click', () => this.githubManager.hideGithubModal());
+        const closeGithubModal = document.getElementById('closeGithubModal');
+        if (closeGithubModal) {
+            closeGithubModal.addEventListener('click', () => this.githubManager.hideGithubModal());
+        }
 
-        document.getElementById('optionsBtn').addEventListener('click', () => this.showOptionsModal());
-        document.getElementById('closeOptionsModal').addEventListener('click', () => this.hideOptionsModal());
+        const optionsBtn = document.getElementById('optionsBtn');
+        if (optionsBtn) {
+            optionsBtn.addEventListener('click', () => this.showOptionsModal());
+        }
+        
+        const closeOptionsModal = document.getElementById('closeOptionsModal');
+        if (closeOptionsModal) {
+            closeOptionsModal.addEventListener('click', () => this.hideOptionsModal());
+        }
 
-        document.getElementById('mainPanelTabs').addEventListener('click', (e) => {
-            if (e.target.classList.contains('panel-tab')) {
-                this.switchMainPanel(e.target.dataset.panel);
-            }
-        });
+        const mainPanelTabs = document.getElementById('mainPanelTabs');
+        if (mainPanelTabs) {
+            mainPanelTabs.addEventListener('click', (e) => {
+                if (e.target.classList.contains('panel-tab')) {
+                    this.switchMainPanel(e.target.dataset.panel);
+                }
+            });
+        }
 
-        document.getElementById('addFileBtnSidebar').addEventListener('click', () => this.addFile());
-        document.getElementById('uploadFileBtnSidebar').addEventListener('click', () => this.uploadFile());
+        const addFileBtnSidebar = document.getElementById('addFileBtnSidebar');
+        if (addFileBtnSidebar) {
+            addFileBtnSidebar.addEventListener('click', () => this.addFile());
+        }
+        
+        const uploadFileBtnSidebar = document.getElementById('uploadFileBtnSidebar');
+        if (uploadFileBtnSidebar) {
+            uploadFileBtnSidebar.addEventListener('click', () => this.uploadFile());
+        }
 
-        document.getElementById('fileTreeContainer').addEventListener('click', (e) => {
-            const target = e.target;
+        const fileTreeContainer = document.getElementById('fileTreeContainer');
+        if (fileTreeContainer) {
+            fileTreeContainer.addEventListener('click', (e) => {
+                const target = e.target;
 
-            // Toggle "more" menu
-            const moreBtn = target.closest('.file-more-btn');
-            if (moreBtn) {
-                e.stopPropagation();
-                const file = moreBtn.dataset.file;
-                const item = moreBtn.closest('.tree-file-item');
-                const menu = item.querySelector('.more-menu');
+                // Toggle "more" menu
+                const moreBtn = target.closest('.file-more-btn');
+                if (moreBtn) {
+                    e.stopPropagation();
+                    const file = moreBtn.dataset.file;
+                    const item = moreBtn.closest('.tree-file-item');
+                    const menu = item.querySelector('.more-menu');
                 // Close any open menus first
                 document.querySelectorAll('.more-menu').forEach(m => { if (m !== menu) m.style.display = 'none'; m?.closest('.tree-file-item')?.classList?.remove('more-open'); });
                 // Position menu under button and toggle
