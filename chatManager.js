@@ -358,22 +358,24 @@ export class ChatManager {
             // The AI's message will then be processed and displayed.
             this.stopLoadingAnimation();
 
+            // Normalize provider responses into a raw string
+            let raw = '';
+            try {
+                if (typeof completion === 'string') raw = completion;
+                else if (completion?.content) raw = completion.content;
+                else if (completion?.message?.content) raw = completion.message.content;
+                else if (completion?.choices?.[0]?.message?.content) raw = completion.choices[0].message.content;
+                else if (completion?.text) raw = completion.text;
+                else raw = JSON.stringify(completion ?? {});
+            } catch (_) { raw = String(completion ?? ''); }
+
             let parsedResponse;
             try {
-                parsedResponse = JSON.parse(completion.content);
+                parsedResponse = JSON.parse(raw);
             } catch (jsonError) {
-                console.error("Error parsing AI response JSON:", jsonError);
-                console.error("Raw AI response content:", completion.content);
-
-                const fallbackResponse = this.extractFallbackResponse(completion.content);
-                if (fallbackResponse) {
-                    parsedResponse = fallbackResponse;
-                } else {
-                    parsedResponse = {
-                        message: "I apologize, but I encountered an issue with my response format. Please try again or rephrase your request.",
-                        files: {}
-                    };
-                }
+                // Try to salvage JSON from within raw
+                const fallbackResponse = this.extractFallbackResponse(raw);
+                parsedResponse = fallbackResponse || { message: raw || "I'm connected and ready.", files: {} };
             }
 
             if (typeof parsedResponse.message !== 'string') {
@@ -556,57 +558,62 @@ export class ChatManager {
 
     // NEW: choose provider at runtime and call appropriate API (websim or PuterService)
     async requestAIResponse(payload) {
+        // Timeout + robust fallback so the chat never hangs
+        const withTimeout = (p, ms = 9000) => {
+            return Promise.race([
+                p,
+                new Promise((_, rej) => setTimeout(() => rej(new Error('AI provider timeout')), ms))
+            ]);
+        };
+        
         try {
             // Prefer the user's selected model (Puter KV / localStorage) when available
             const pref = (window.getPreferredModel) ? await window.getPreferredModel() : (this.app.aiProvider || 'websim:gpt5-nano');
             const providerId = pref || (this.app.aiProvider || 'websim:gpt5-nano');
             const [backend, model] = (providerId || 'websim:gpt5-nano').split(':');
 
-            // Websim routing: use websim.chat.completions.create if available
-            if (backend === 'websim' && window.websim && websim.chat && websim.chat.completions) {
-                const req = { ...payload };
-                if (model) req.model = model;
-                return await websim.chat.completions.create(req);
-            }
+            // Helper to invoke Puter chat (tries multiple surfaces)
+            const callPuter = async () => {
+                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                if (window.PuterService?.ai?.chat) return await withTimeout(window.PuterService.ai.chat(opts));
+                if (window.Puter?.ai?.chat)       return await withTimeout(window.Puter.ai.chat(opts));
+                if (window.PuterAPI?.ai?.chat)    return await withTimeout(window.PuterAPI.ai.chat(opts));
+                throw new Error('Puter AI not available');
+            };
 
-            // Puter routing: support multiple surfaces (PuterService, Puter, PuterAPI)
+            // Helper to invoke WebSim chat
+            const callWebsim = async () => {
+                if (window.websim?.chat?.completions?.create) {
+                    const req = { ...payload };
+                    if (model) req.model = model;
+                    return await withTimeout(websim.chat.completions.create(req));
+                }
+                throw new Error('WebSim AI not available');
+            };
+
+            // Route by backend with graceful fallback
             if (backend === 'puter') {
-                // Prefer PuterService if present (legacy expectation)
-                if (window.PuterService?.ai?.chat) {
-                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
-                    return await window.PuterService.ai.chat(opts);
-                }
-                // Fallback to Puter SDK directly
-                if (window.Puter?.ai?.chat) {
-                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
-                    return await window.Puter.ai.chat(opts);
-                }
-                // Fallback to PuterAPI shim
-                if (window.PuterAPI?.ai?.chat) {
-                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
-                    return await window.PuterAPI.ai.chat(opts);
+                try {
+                    const r = await callPuter();
+                    if (r) return r;
+                    throw new Error('Empty response from Puter AI');
+                } catch (e) {
+                    console.warn('Puter AI failed, falling back to WebSim:', e?.message || e);
+                    return await callWebsim();
                 }
             }
 
-            // Generic fallback: try Puter then Websim regardless of backend
-            if (window.PuterService?.ai?.chat) {
-                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
-                return await window.PuterService.ai.chat(opts);
+            if (backend === 'websim') {
+                try {
+                    return await callWebsim();
+                } catch (e) {
+                    console.warn('WebSim AI failed, trying Puter as fallback:', e?.message || e);
+                    return await callPuter();
+                }
             }
-            if (window.Puter?.ai?.chat) {
-                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
-                return await window.Puter.ai.chat(opts);
-            }
-            if (window.PuterAPI?.ai?.chat) {
-                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
-                return await window.PuterAPI.ai.chat(opts);
-            }
-            if (window.websim?.chat?.completions) {
-                const req = { ...payload };
-                if (model) req.model = model;
-                return await websim.chat.completions.create(req);
-            }
-            throw new Error('No available AI provider found (Puter or WebSim).');
+
+            // Generic fallback: try Puter then WebSim
+            try { return await callPuter(); } catch { return await callWebsim(); }
         } catch (err) {
             throw err;
         }

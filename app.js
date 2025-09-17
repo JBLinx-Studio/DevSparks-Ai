@@ -27,16 +27,6 @@ export class App {
         this.currentUser = null;
         this.speechEnabled = JSON.parse(localStorage.getItem('speechEnabled') || 'true');
         this.voicePreference = localStorage.getItem('voicePreference') || 'en-female';
-        
-        // Theme management
-        this.currentTheme = localStorage.getItem('theme') || 'light';
-        this.initializeTheme();
-
-        this.puterEnabled = false;
-        this.puterUser = null;
-        this.currentUser = null;
-        this.speechEnabled = JSON.parse(localStorage.getItem('speechEnabled') || 'true');
-        this.voicePreference = localStorage.getItem('voicePreference') || 'en-female';
         this.availableVoices = [
             { id: "en-female", name: "English (Female)" },
             { id: "en-male", name: "English (Male)" },
@@ -104,7 +94,6 @@ export class App {
         this.switchMainPanel(this.currentMainPanel);
         this.updateSpeechControlsUI();
         this.githubManager.checkGithubConnection();
-        this.updateThemeUI();
 
         this.initCurrentUser().then(() => {
             this.initPuterStorage().then(() => {
@@ -246,35 +235,6 @@ export class App {
         this.updatePuterStatusUI();
     }
 
-    initializeTheme() {
-        // Apply the current theme to document
-        document.documentElement.setAttribute('data-theme', this.currentTheme);
-    }
-
-    toggleTheme() {
-        this.currentTheme = this.currentTheme === 'light' ? 'dark' : 'light';
-        localStorage.setItem('theme', this.currentTheme);
-        document.documentElement.setAttribute('data-theme', this.currentTheme);
-        this.updateThemeUI();
-        this.addConsoleMessage('info', `Switched to ${this.currentTheme} theme`);
-    }
-
-    updateThemeUI() {
-        const themeToggle = document.getElementById('themeToggle');
-        const themeText = document.getElementById('themeText');
-        const themeIcon = themeToggle?.querySelector('svg path');
-        
-        if (themeText && themeIcon) {
-            if (this.currentTheme === 'dark') {
-                themeText.textContent = 'Light';
-                themeIcon.setAttribute('d', 'M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8z');
-            } else {
-                themeText.textContent = 'Dark';
-                themeIcon.setAttribute('d', 'M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z');
-            }
-        }
-    }
-
     updatePuterStatusUI() {
         const statusDiv = document.getElementById('cloudStorageStatus');
         if (statusDiv) {
@@ -293,9 +253,6 @@ export class App {
     setupEventListeners() {
         this.imagePreviewOverlay = document.getElementById('imagePreviewOverlay');
         this.videoPreviewOverlay = document.getElementById('videoPreviewOverlay');
-
-        // Theme toggle
-        document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
 
         document.getElementById('sendBtn').addEventListener('click', () => this.chatManager.sendMessage());
         document.getElementById('messageInput').addEventListener('keypress', (e) => {
@@ -654,6 +611,49 @@ export class App {
         const aiApiKeyInput = document.getElementById('aiApiKeyInput');
         if (aiProviderSelect) aiProviderSelect.addEventListener('change', (e) => this.selectAIProvider(e.target.value));
         if (aiApiKeyInput) aiApiKeyInput.addEventListener('input', (e) => this.setAIApiKey(e.target.value));
+
+        // Wire Puter actions in Options modal
+        const puterSignInBtn = document.getElementById('puterOptionsSignInBtn');
+        const puterSignOutBtn = document.getElementById('puterOptionsSignOutBtn');
+        const puterStorageInfoBtn = document.getElementById('puterOptionsStorageInfoBtn');
+        const puterAccountStatus = document.getElementById('puterAccountStatus');
+        const puterAccountDetails = document.getElementById('puterAccountDetails');
+        if (puterSignInBtn) puterSignInBtn.addEventListener('click', async () => {
+            try {
+                await window.PuterShim?.ensureSignedInInteractive?.();
+                this.puterEnabled = !!(window.PuterShim?.user);
+                this.puterUser = window.PuterShim?.user || this.puterUser;
+                this.updatePuterStatusUI();
+                this.updateAIProviderControlsUI();
+                if (puterAccountStatus && this.puterUser) puterAccountStatus.textContent = `Puter: Connected — ${this.puterUser.username || this.puterUser.id}`;
+                if (puterSignOutBtn) puterSignOutBtn.style.display = '';
+                if (puterAccountDetails && this.puterUser) { puterAccountDetails.style.display = 'block'; puterAccountDetails.textContent = JSON.stringify({ whoami: this.puterUser }, null, 2); }
+                // Auto-switch AI to Puter GPT-5
+                this.selectAIProvider('puter:gpt-5');
+            } catch (e) {
+                this.addConsoleMessage('error', 'Puter sign-in failed: ' + (e?.message || e));
+            }
+        });
+        if (puterSignOutBtn) puterSignOutBtn.addEventListener('click', async () => {
+            try {
+                await window.Puter?.auth?.signOut?.();
+            } catch {}
+            this.puterEnabled = false;
+            this.puterUser = null;
+            this.updatePuterStatusUI();
+            this.updateAIProviderControlsUI();
+            if (puterAccountStatus) puterAccountStatus.textContent = 'Puter: Signed out';
+            if (puterSignOutBtn) puterSignOutBtn.style.display = 'none';
+            if (puterAccountDetails) { puterAccountDetails.style.display = 'none'; puterAccountDetails.textContent = ''; }
+        });
+        if (puterStorageInfoBtn) puterStorageInfoBtn.addEventListener('click', async () => {
+            try {
+                const info = await window.PuterShim?.getStorageInfo?.();
+                if (puterAccountDetails) { puterAccountDetails.style.display = 'block'; puterAccountDetails.textContent = JSON.stringify(info, null, 2); }
+            } catch (e) {
+                this.addConsoleMessage('error', 'Failed to fetch storage info: ' + (e?.message || e));
+            }
+        });
 
         // Reasonings panel controls
         const reasoningSelect = document.getElementById('reasoningModeSelect');
@@ -1727,9 +1727,19 @@ export class App {
         const aiProviderSelect = document.getElementById('aiProviderSelect');
         const aiApiKeyInput = document.getElementById('aiApiKeyInput');
 
+        // If Puter is connected, only show Puter providers and default to GPT-5
+        let providers = [...this.availableAIProviders];
+        if (this.puterEnabled) {
+            providers = providers.filter(p => p.id.startsWith('puter:'));
+            if (!this.aiProvider || !this.aiProvider.startsWith('puter:')) {
+                this.aiProvider = 'puter:gpt-5';
+                this.saveAIPreferences();
+            }
+        }
+
         if (aiProviderSelect) {
             aiProviderSelect.innerHTML = '';
-            this.availableAIProviders.forEach(provider => {
+            providers.forEach(provider => {
                 const option = document.createElement('option');
                 option.value = provider.id;
                 option.textContent = provider.name;
@@ -1739,15 +1749,14 @@ export class App {
         }
 
         if (aiApiKeyInput) {
-            aiApiKeyInput.disabled = (this.aiProvider === 'websim');
-            if (this.aiProvider === 'websim') {
-                aiApiKeyInput.value = '';
-                aiApiKeyInput.placeholder = 'Not applicable for Websim AI (Free)';
-            } else {
-                aiApiKeyInput.value = this.aiApiKey;
-                aiApiKeyInput.placeholder = 'Enter API Key (optional)';
-            }
+            const isWebsim = this.aiProvider?.startsWith('websim');
+            aiApiKeyInput.disabled = isWebsim;
+            aiApiKeyInput.value = isWebsim ? '' : this.aiApiKey;
+            aiApiKeyInput.placeholder = isWebsim ? 'Not applicable for Websim AI (Free)' : 'Enter API Key (optional)';
         }
+
+        // Keep header AI badge in sync if external selector is present
+        try { window.setPreferredModel?.(this.aiProvider); } catch {}
     }
 
     selectAIProvider(providerId) {
@@ -2408,264 +2417,68 @@ export class App {
 
         deployPanelContent.innerHTML = `
             <div class="deploy-section">
-                <h4 style="margin-bottom: var(--spacing-md); color: var(--color-text-dark);">GitHub Pages Deployment</h4>
+                <h4 style="margin-bottom: var(--spacing-md); color: var(--color-text-dark);">Deployment Information</h4>
                 <div class="deploy-info">
-                    <p><strong>Project Name:</strong> <span id="deployProjectName">${this.currentProject?.name || 'Untitled'}</span></p>
-                    <p><strong>GitHub Repository:</strong> <span id="githubRepoInfo">${this.githubManager?.currentRepoInfo ? `${this.githubManager.currentRepoInfo.owner}/${this.githubManager.currentRepoInfo.name}` : 'Not connected'}</span></p>
-                    <p><strong>Deployment Status:</strong> <span id="deploymentStatus">Ready to deploy</span></p>
+                    <p><strong>Project Name:</strong> ${this.currentProject?.name || 'N/A'}</p>
+                    <p><strong>Deployment Status:</strong> <span id="deploymentStatus">Not deployed yet.</span></p>
                     <p><strong>Last Deployed:</strong> <span id="lastDeployedDate">N/A</span></p>
-                    <p><strong>Pages URL:</strong> <span id="pagesUrl">Will be available after first deployment</span></p>
-                    
-                    <div style="margin: var(--spacing-lg) 0;">
-                        <button class="btn btn-primary" id="startDeployBtn" ${!this.githubManager?.githubToken ? 'disabled title="Connect to GitHub first"' : ''}>
-                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                    <p><strong>Deployment URL:</strong> <a href="${this.mockDeploymentUrl}" target="_blank" id="deploymentUrl" style="color: var(--color-primary-light); text-decoration: underline;">${this.mockDeploymentUrl}</a></p>
+                    <div style="margin-top: var(--spacing-lg);">
+                        <button class="btn btn-primary" id="startDeployBtn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-upload-fill" viewBox="0 0 16 16">
+                                <path fill-rule="evenodd" d="M8 0a5.53 5.53 0 0 0-3.594 1.399l-.796.796A.5.5 0 0 1 3 2.5a.5.5 0 0 0-.006-.006l-.515-.515a.5.5 0 0 1-.707 0L1.002 1.58C.723 1.301.916.906 1.406.81l.718.14a.5.5 0 0 1 .447.447l.14.718A5.53 5.53 0 0 0 8 0zm0 16a5.53 5.53 0 0 0 3.594-1.399l.796-.796a.5.5 0 0 1 .447.272l-1.5-3A.5.5 0 0 0 14.5 4h-13a.5.5 0 0 0-.447.272l.5 1A.5.5 0 0 0 12.947 10.957z"/>
                             </svg>
-                            Deploy to GitHub Pages
+                            Deploy Now
                         </button>
-                    </div>
-                        
-                    <div id="deploymentLog" style="margin-top: var(--spacing-lg); background-color: var(--color-bg-medium); padding: var(--spacing-md); border: 1px solid var(--color-border); font-family: 'Space Mono', monospace; font-size: 13px; max-height: 200px; overflow-y: auto; border-radius: 4px;">
-                        <p style="color: var(--color-text-medium);">Deployment log will appear here...</p>
+                        <div id="deploymentLog" style="margin-top: var(--spacing-lg); background-color: var(--color-bg-light); padding: var(--spacing-md); border: 1px solid var(--color-border); font-family: 'Space Mono', monospace; font-size: 13px; max-height: 200px; overflow-y: auto;">
+                            <p style="color: var(--color-text-medium);">Deployment log will appear here...</p>
+                        </div>
                     </div>
                 </div>
             </div>
         `;
 
-        // Add event listener for deployment
-        document.getElementById('startDeployBtn').addEventListener('click', () => this.deployToGitHubPages());
+        document.getElementById('startDeployBtn').addEventListener('click', () => this.startMockDeployment());
     }
 
-    async deployToGitHubPages() {
+    async startMockDeployment() {
         const deployBtn = document.getElementById('startDeployBtn');
         const deploymentStatusSpan = document.getElementById('deploymentStatus');
         const lastDeployedDateSpan = document.getElementById('lastDeployedDate');
         const deploymentLog = document.getElementById('deploymentLog');
-        const pagesUrlSpan = document.getElementById('pagesUrl');
 
         if (!deployBtn || !deploymentStatusSpan || !deploymentLog) return;
 
-        // Check if GitHub is connected
-        if (!this.githubManager?.githubToken) {
-            this.showTemporaryFeedback('Please connect to GitHub first', 'error');
-            return;
-        }
-
         deployBtn.disabled = true;
         deployBtn.textContent = 'Deploying...';
-        deploymentStatusSpan.textContent = 'Deploying to GitHub Pages...';
-        deploymentLog.innerHTML = '';
+        this.showTemporaryFeedback('Starting deployment...', 'info');
+        deploymentLog.innerHTML = ''; // Clear previous log
 
-        const addLogEntry = (message, type = 'info') => {
-            const logEntry = document.createElement('div');
-            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            logEntry.style.color = type === 'error' ? 'var(--color-error-text)' : 
-                                  type === 'success' ? 'var(--color-success-text)' : 
-                                  'var(--color-info-text)';
-            deploymentLog.appendChild(logEntry);
-            deploymentLog.scrollTop = deploymentLog.scrollHeight;
-        };
-
-        try {
-            addLogEntry('Starting GitHub Pages deployment...');
-
-            // First, sync the project to GitHub
-            if (!this.githubManager.currentRepoInfo) {
-                addLogEntry('Syncing project to GitHub...');
-                await this.githubManager.syncToGithub();
-                addLogEntry('Project synced to GitHub successfully');
-            }
-
-            const { owner, name } = this.githubManager.currentRepoInfo;
-            addLogEntry(`Configuring GitHub Pages for ${owner}/${name}...`);
-
-            // Step 1: Get repository information
-            let repoResponse = await fetch(`https://api.github.com/repos/${owner}/${name}`, {
-                headers: {
-                    'Authorization': `token ${this.githubManager.githubToken}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
-
-            if (!repoResponse.ok) {
-                throw new Error(`Failed to fetch repository: ${repoResponse.statusText}`);
-            }
-
-            const repoData = await repoResponse.json();
-            addLogEntry('Repository information retrieved');
-
-            // Step 2: Check if gh-pages branch exists
-            let branchExists = false;
-            try {
-                const branchResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/branches/gh-pages`, {
-                    headers: {
-                        'Authorization': `token ${this.githubManager.githubToken}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-                branchExists = branchResponse.ok;
-            } catch (error) {
-                // Branch doesn't exist, we'll create it
-            }
-
-            if (!branchExists) {
-                addLogEntry('Creating gh-pages branch...');
-                
-                // Get the default branch SHA
-                const defaultBranch = repoData.default_branch;
-                const branchRefResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/git/refs/heads/${defaultBranch}`, {
-                    headers: {
-                        'Authorization': `token ${this.githubManager.githubToken}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-                
-                const branchRef = await branchRefResponse.json();
-                const baseSha = branchRef.object.sha;
-
-                // Create gh-pages branch
-                await fetch(`https://api.github.com/repos/${owner}/${name}/git/refs`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `token ${this.githubManager.githubToken}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        ref: 'refs/heads/gh-pages',
-                        sha: baseSha
-                    })
-                });
-
-                addLogEntry('gh-pages branch created successfully');
+        let currentPhaseIndex = 0;
+        const animateDeployment = () => {
+            if (currentPhaseIndex < this.mockDeploymentStatusMessages.length) {
+                const message = this.mockDeploymentStatusMessages[currentPhaseIndex];
+                deploymentStatusSpan.textContent = message;
+                const logEntry = document.createElement('p');
+                logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                logEntry.style.color = currentPhaseIndex === this.mockDeploymentStatusMessages.length - 1 ? 'var(--color-success-text)' : 'var(--color-info-text)';
+                deploymentLog.appendChild(logEntry);
+                deploymentLog.scrollTop = deploymentLog.scrollHeight;
+                currentPhaseIndex++;
+                setTimeout(animateDeployment, this.mockDeploymentPhaseDuration);
             } else {
-                addLogEntry('gh-pages branch already exists');
-            }
-
-            // Step 3: Upload project files to gh-pages branch
-            addLogEntry('Uploading project files to gh-pages...');
-            
-            const filesToUpload = Object.entries(this.currentFiles);
-            for (const [filename, content] of filesToUpload) {
-                await this.githubManager.uploadFile(owner, name, filename, content, 'gh-pages');
-                addLogEntry(`Uploaded: ${filename}`);
-            }
-
-            // Step 4: Enable GitHub Pages
-            addLogEntry('Enabling GitHub Pages...');
-            
-            const pagesResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/pages`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `token ${this.githubManager.githubToken}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    source: {
-                        branch: 'gh-pages',
-                        path: '/'
-                    }
-                })
-            });
-
-            let pagesData;
-            if (pagesResponse.status === 201) {
-                pagesData = await pagesResponse.json();
-                addLogEntry('GitHub Pages enabled successfully');
-            } else if (pagesResponse.status === 409) {
-                // Pages already enabled, get existing configuration
-                const existingPagesResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/pages`, {
-                    headers: {
-                        'Authorization': `token ${this.githubManager.githubToken}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-                pagesData = await existingPagesResponse.json();
-                addLogEntry('GitHub Pages was already enabled');
-            } else {
-                throw new Error(`Failed to enable Pages: ${pagesResponse.statusText}`);
-            }
-
-            // Step 5: Display success and URL
-            const pagesUrl = pagesData.html_url || `https://${owner}.github.io/${name}`;
-            addLogEntry(`Deployment completed successfully!`, 'success');
-            addLogEntry(`Your site is available at: ${pagesUrl}`, 'success');
-            
-            deploymentStatusSpan.textContent = 'Deployed Successfully';
-            deploymentStatusSpan.style.color = 'var(--color-success-text)';
-            lastDeployedDateSpan.textContent = new Date().toLocaleString();
-            pagesUrlSpan.innerHTML = `<a href="${pagesUrl}" target="_blank" style="color: var(--color-primary); text-decoration: none;">${pagesUrl}</a>`;
-
-            // Enable GitHub Pages on the repository
-            const enablePagesResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/pages`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `token ${this.githubManager.githubToken}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    source: {
-                        branch: 'main',
-                        path: '/'
-                    }
-                })
-            });
-
-            if (enablePagesResponse.ok) {
-                const pagesInfo = await enablePagesResponse.json();
-                addLogEntry('GitHub Pages enabled successfully');
-                addLogEntry(`Pages URL: ${pagesInfo.html_url}`);
-                
-                pagesUrlSpan.innerHTML = `<a href="${pagesInfo.html_url}" target="_blank" style="color: var(--color-primary-light); text-decoration: underline;">${pagesInfo.html_url}</a>`;
-                deploymentStatusSpan.textContent = 'Deployed successfully';
+                deployBtn.disabled = false;
+                deployBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-upload-fill" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M8 0a5.53 5.53 0 0 0-3.594 1.399l-.796.796A.5.5 0 0 1 3 2.5a.5.5 0 0 0-.006-.006l-.515-.515a.5.5 0 0 1-.707 0L1.002 1.58C.723 1.301.916.906 1.406.81l.718.14a.5.5 0 0 1 .447.447l.14.718A5.53 5.53 0 0 0 8 0zm0 16a5.53 5.53 0 0 0 3.594-1.399l.796-.796a.5.5 0 0 1 .447.272l-1.5-3A.5.5 0 0 0 14.5 4h-13a.5.5 0 0 0-.447.272l.5 1A.5.5 0 0 0 12.947 10.957z"/>
+                    </svg>
+                    Deploy Now
+                `;
+                this.showTemporaryFeedback('Deployment complete!', 'success');
                 lastDeployedDateSpan.textContent = new Date().toLocaleString();
-                
-                this.showTemporaryFeedback('Deployed to GitHub Pages successfully!', 'success');
-            } else if (enablePagesResponse.status === 409) {
-                // Pages already enabled, just get the info
-                addLogEntry('GitHub Pages already enabled, fetching info...');
-                
-                const getPagesResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/pages`, {
-                    headers: {
-                        'Authorization': `token ${this.githubManager.githubToken}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                });
-
-                if (getPagesResponse.ok) {
-                    const pagesInfo = await getPagesResponse.json();
-                    addLogEntry(`Pages URL: ${pagesInfo.html_url}`);
-                    pagesUrlSpan.innerHTML = `<a href="${pagesInfo.html_url}" target="_blank" style="color: var(--color-primary-light); text-decoration: underline;">${pagesInfo.html_url}</a>`;
-                    deploymentStatusSpan.textContent = 'Deployed successfully';
-                    lastDeployedDateSpan.textContent = new Date().toLocaleString();
-                    
-                    this.showTemporaryFeedback('Project is already deployed to GitHub Pages!', 'success');
-                } else {
-                    throw new Error('Failed to fetch Pages information');
-                }
-            } else {
-                const errorData = await enablePagesResponse.json().catch(() => ({ message: 'Unknown error' }));
-                throw new Error(`Failed to enable GitHub Pages: ${errorData.message}`);
             }
-
-            addLogEntry('Deployment completed successfully!', 'success');
-            
-        } catch (error) {
-            addLogEntry(`Deployment failed: ${error.message}`, 'error');
-            deploymentStatusSpan.textContent = 'Deployment failed';
-            this.showTemporaryFeedback(`Deployment failed: ${error.message}`, 'error');
-            console.error('GitHub Pages deployment error:', error);
-        } finally {
-            deployBtn.disabled = false;
-            deployBtn.innerHTML = `
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
-                </svg>
-                Deploy to GitHub Pages
-            `;
-        }
+        };
+        animateDeployment();
     }
 
     async generateImageFromMessage(prompt) {
