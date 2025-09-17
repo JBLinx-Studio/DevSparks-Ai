@@ -2365,68 +2365,146 @@ export class App {
 
         deployPanelContent.innerHTML = `
             <div class="deploy-section">
-                <h4 style="margin-bottom: var(--spacing-md); color: var(--color-text-dark);">Deployment Information</h4>
+                <h4 style="margin-bottom: var(--spacing-md); color: var(--color-text-dark);">GitHub Pages Deployment</h4>
                 <div class="deploy-info">
-                    <p><strong>Project Name:</strong> ${this.currentProject?.name || 'N/A'}</p>
-                    <p><strong>Deployment Status:</strong> <span id="deploymentStatus">Not deployed yet.</span></p>
+                    <p><strong>Project Name:</strong> <span id="deployProjectName">${this.currentProject?.name || 'Untitled'}</span></p>
+                    <p><strong>GitHub Repository:</strong> <span id="githubRepoInfo">${this.githubManager?.currentRepoInfo ? `${this.githubManager.currentRepoInfo.owner}/${this.githubManager.currentRepoInfo.name}` : 'Not connected'}</span></p>
+                    <p><strong>Deployment Status:</strong> <span id="deploymentStatus">Ready to deploy</span></p>
                     <p><strong>Last Deployed:</strong> <span id="lastDeployedDate">N/A</span></p>
-                    <p><strong>Deployment URL:</strong> <a href="${this.mockDeploymentUrl}" target="_blank" id="deploymentUrl" style="color: var(--color-primary-light); text-decoration: underline;">${this.mockDeploymentUrl}</a></p>
-                    <div style="margin-top: var(--spacing-lg);">
-                        <button class="btn btn-primary" id="startDeployBtn">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-upload-fill" viewBox="0 0 16 16">
-                                <path fill-rule="evenodd" d="M8 0a5.53 5.53 0 0 0-3.594 1.399l-.796.796A.5.5 0 0 1 3 2.5a.5.5 0 0 0-.006-.006l-.515-.515a.5.5 0 0 1-.707 0L1.002 1.58C.723 1.301.916.906 1.406.81l.718.14a.5.5 0 0 1 .447.447l.14.718A5.53 5.53 0 0 0 8 0zm0 16a5.53 5.53 0 0 0 3.594-1.399l.796-.796a.5.5 0 0 1 .447.272l-1.5-3A.5.5 0 0 0 14.5 4h-13a.5.5 0 0 0-.447.272l.5 1A.5.5 0 0 0 12.947 10.957z"/>
+                    <p><strong>Pages URL:</strong> <span id="pagesUrl">Will be available after first deployment</span></p>
+                    
+                    <div style="margin: var(--spacing-lg) 0;">
+                        <button class="btn btn-primary" id="startDeployBtn" ${!this.githubManager?.githubToken ? 'disabled title="Connect to GitHub first"' : ''}>
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
                             </svg>
-                            Deploy Now
+                            Deploy to GitHub Pages
                         </button>
-                        <div id="deploymentLog" style="margin-top: var(--spacing-lg); background-color: var(--color-bg-light); padding: var(--spacing-md); border: 1px solid var(--color-border); font-family: 'Space Mono', monospace; font-size: 13px; max-height: 200px; overflow-y: auto;">
-                            <p style="color: var(--color-text-medium);">Deployment log will appear here...</p>
-                        </div>
+                    </div>
+                        
+                    <div id="deploymentLog" style="margin-top: var(--spacing-lg); background-color: var(--color-bg-medium); padding: var(--spacing-md); border: 1px solid var(--color-border); font-family: 'Space Mono', monospace; font-size: 13px; max-height: 200px; overflow-y: auto; border-radius: 4px;">
+                        <p style="color: var(--color-text-medium);">Deployment log will appear here...</p>
                     </div>
                 </div>
             </div>
         `;
 
-        document.getElementById('startDeployBtn').addEventListener('click', () => this.startMockDeployment());
+        // Add event listener for deployment
+        document.getElementById('startDeployBtn').addEventListener('click', () => this.deployToGitHubPages());
     }
 
-    async startMockDeployment() {
+    async deployToGitHubPages() {
         const deployBtn = document.getElementById('startDeployBtn');
         const deploymentStatusSpan = document.getElementById('deploymentStatus');
         const lastDeployedDateSpan = document.getElementById('lastDeployedDate');
         const deploymentLog = document.getElementById('deploymentLog');
+        const pagesUrlSpan = document.getElementById('pagesUrl');
 
         if (!deployBtn || !deploymentStatusSpan || !deploymentLog) return;
 
+        // Check if GitHub is connected
+        if (!this.githubManager?.githubToken) {
+            this.showTemporaryFeedback('Please connect to GitHub first', 'error');
+            return;
+        }
+
         deployBtn.disabled = true;
         deployBtn.textContent = 'Deploying...';
-        this.showTemporaryFeedback('Starting deployment...', 'info');
-        deploymentLog.innerHTML = ''; // Clear previous log
+        deploymentStatusSpan.textContent = 'Deploying to GitHub Pages...';
+        deploymentLog.innerHTML = '';
 
-        let currentPhaseIndex = 0;
-        const animateDeployment = () => {
-            if (currentPhaseIndex < this.mockDeploymentStatusMessages.length) {
-                const message = this.mockDeploymentStatusMessages[currentPhaseIndex];
-                deploymentStatusSpan.textContent = message;
-                const logEntry = document.createElement('p');
-                logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-                logEntry.style.color = currentPhaseIndex === this.mockDeploymentStatusMessages.length - 1 ? 'var(--color-success-text)' : 'var(--color-info-text)';
-                deploymentLog.appendChild(logEntry);
-                deploymentLog.scrollTop = deploymentLog.scrollHeight;
-                currentPhaseIndex++;
-                setTimeout(animateDeployment, this.mockDeploymentPhaseDuration);
-            } else {
-                deployBtn.disabled = false;
-                deployBtn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-upload-fill" viewBox="0 0 16 16">
-                        <path fill-rule="evenodd" d="M8 0a5.53 5.53 0 0 0-3.594 1.399l-.796.796A.5.5 0 0 1 3 2.5a.5.5 0 0 0-.006-.006l-.515-.515a.5.5 0 0 1-.707 0L1.002 1.58C.723 1.301.916.906 1.406.81l.718.14a.5.5 0 0 1 .447.447l.14.718A5.53 5.53 0 0 0 8 0zm0 16a5.53 5.53 0 0 0 3.594-1.399l.796-.796a.5.5 0 0 1 .447.272l-1.5-3A.5.5 0 0 0 14.5 4h-13a.5.5 0 0 0-.447.272l.5 1A.5.5 0 0 0 12.947 10.957z"/>
-                    </svg>
-                    Deploy Now
-                `;
-                this.showTemporaryFeedback('Deployment complete!', 'success');
-                lastDeployedDateSpan.textContent = new Date().toLocaleString();
-            }
+        const addLogEntry = (message, type = 'info') => {
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEntry.style.color = type === 'error' ? 'var(--color-error-text)' : 
+                                  type === 'success' ? 'var(--color-success-text)' : 
+                                  'var(--color-info-text)';
+            deploymentLog.appendChild(logEntry);
+            deploymentLog.scrollTop = deploymentLog.scrollHeight;
         };
-        animateDeployment();
+
+        try {
+            addLogEntry('Starting GitHub Pages deployment...');
+
+            // First, sync the project to GitHub
+            if (!this.githubManager.currentRepoInfo) {
+                addLogEntry('Syncing project to GitHub...');
+                await this.githubManager.syncToGithub();
+                addLogEntry('Project synced to GitHub successfully');
+            }
+
+            const { owner, name } = this.githubManager.currentRepoInfo;
+            addLogEntry(`Configuring GitHub Pages for ${owner}/${name}...`);
+
+            // Enable GitHub Pages on the repository
+            const enablePagesResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/pages`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `token ${this.githubManager.githubToken}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    source: {
+                        branch: 'main',
+                        path: '/'
+                    }
+                })
+            });
+
+            if (enablePagesResponse.ok) {
+                const pagesInfo = await enablePagesResponse.json();
+                addLogEntry('GitHub Pages enabled successfully');
+                addLogEntry(`Pages URL: ${pagesInfo.html_url}`);
+                
+                pagesUrlSpan.innerHTML = `<a href="${pagesInfo.html_url}" target="_blank" style="color: var(--color-primary-light); text-decoration: underline;">${pagesInfo.html_url}</a>`;
+                deploymentStatusSpan.textContent = 'Deployed successfully';
+                lastDeployedDateSpan.textContent = new Date().toLocaleString();
+                
+                this.showTemporaryFeedback('Deployed to GitHub Pages successfully!', 'success');
+            } else if (enablePagesResponse.status === 409) {
+                // Pages already enabled, just get the info
+                addLogEntry('GitHub Pages already enabled, fetching info...');
+                
+                const getPagesResponse = await fetch(`https://api.github.com/repos/${owner}/${name}/pages`, {
+                    headers: {
+                        'Authorization': `token ${this.githubManager.githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (getPagesResponse.ok) {
+                    const pagesInfo = await getPagesResponse.json();
+                    addLogEntry(`Pages URL: ${pagesInfo.html_url}`);
+                    pagesUrlSpan.innerHTML = `<a href="${pagesInfo.html_url}" target="_blank" style="color: var(--color-primary-light); text-decoration: underline;">${pagesInfo.html_url}</a>`;
+                    deploymentStatusSpan.textContent = 'Deployed successfully';
+                    lastDeployedDateSpan.textContent = new Date().toLocaleString();
+                    
+                    this.showTemporaryFeedback('Project is already deployed to GitHub Pages!', 'success');
+                } else {
+                    throw new Error('Failed to fetch Pages information');
+                }
+            } else {
+                const errorData = await enablePagesResponse.json().catch(() => ({ message: 'Unknown error' }));
+                throw new Error(`Failed to enable GitHub Pages: ${errorData.message}`);
+            }
+
+            addLogEntry('Deployment completed successfully!', 'success');
+            
+        } catch (error) {
+            addLogEntry(`Deployment failed: ${error.message}`, 'error');
+            deploymentStatusSpan.textContent = 'Deployment failed';
+            this.showTemporaryFeedback(`Deployment failed: ${error.message}`, 'error');
+            console.error('GitHub Pages deployment error:', error);
+        } finally {
+            deployBtn.disabled = false;
+            deployBtn.innerHTML = `
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                Deploy to GitHub Pages
+            `;
+        }
     }
 
     async generateImageFromMessage(prompt) {

@@ -12,15 +12,15 @@
     /* @tweakable [ink color for strokes] */ --color-ink: #000000;
     /* @tweakable [muted ink for lighter text] */ --color-ink-muted: #6b6b6b;
 
-    --color-text-dark: var(--color-ink); /* Very light text for contrast on dark bg */
-    --color-text-medium: var(--color-ink-muted);
-    --color-text-muted: #9AA6B2;
+    --color-text-dark: #e5e7eb; /* Light text for contrast on dark bg */
+    --color-text-medium: #9ca3af; /* Medium gray text */
+    --color-text-muted: #6b7280;
 
-    --color-bg-light: #ffffff; /* Near-black IDE background */
-    --color-bg-medium: #f7f7f7; /* Panels and secondary backgrounds */
-    --color-bg-dark: #efefef; /* Slightly lighter for headers/inputs */
+    --color-bg-light: #1a1b23; /* Dark IDE background */
+    --color-bg-medium: #252730; /* Dark panels and secondary backgrounds */
+    --color-bg-dark: #2d2e3a; /* Darker headers/inputs */
 
-    --color-border: rgba(0,0,0,0.12); /* Subtle borders */
+    --color-border: rgba(255,255,255,0.1); /* Subtle light borders on dark */
     
     --color-success-bg: #10B981; /* Green-500 */
     --color-success-text: #ffffff; /* Green-50 */
@@ -43,7 +43,7 @@
     --shadow-sm: 0 6px 18px rgba(0,0,0,0.12); /* stronger, crisp shadow */
     --shadow-md: 0 14px 30px rgba(0,0,0,0.16);
     --sidebar-width: 280px; /* optimized width for better layout balance */
-    --file-tree-bg: #f1f3f5; /* slightly darker, cooler paper for file area */
+    --file-tree-bg: #1e1f26; /* dark file tree background */
     --file-tree-font-size: 13px; /* more compact font for file tree */
     --file-tree-padding: 8px; /* tighter padding for a denser tree */
 
