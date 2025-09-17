@@ -60,7 +60,7 @@ function createSelector() {
   const panel = document.createElement('div');
   panel.className = 'ai-model-panel';
   panel.style.position = 'absolute';
-  panel.style.background = 'var(--color-bg-light)';
+  panel.style.background = 'var(--color-bg-primary)';
   panel.style.border = '1px solid var(--color-border)';
   panel.style.boxShadow = 'var(--shadow-md)';
   panel.style.padding = '8px';
@@ -241,6 +241,24 @@ function createSelector() {
   // expose helper to list models and pick programmatically
   window.listAvailableModels = () => MODELS.slice();
   window.pickModel = async (id) => selectModel(id);
+
+  // Persist preferred model in Puter KV when available, else localStorage
+  window.getPreferredModel = async () => {
+    try {
+      if (window.PuterAPI?.kv?.get) {
+        const v = await window.PuterAPI.kv.get('preferredModel');
+        if (v) return v;
+      }
+    } catch {}
+    return localStorage.getItem('preferredModel') || 'gpt-5-nano';
+  };
+  window.setPreferredModel = async (id) => {
+    try {
+      localStorage.setItem('preferredModel', id);
+      if (window.PuterAPI?.kv?.put) await window.PuterAPI.kv.put('preferredModel', id);
+    } catch {}
+    return id;
+  };
 
   // init
   renderItems('');

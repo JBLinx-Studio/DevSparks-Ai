@@ -247,6 +247,24 @@ function createSelector() {
   window.listAvailableModels = () => MODELS.slice();
   window.pickModel = async (id) => selectModel(id);
 
+  // Persisted preferences helpers (Puter KV if available, else localStorage)
+  window.getPreferredModel = async () => {
+    try {
+      if (window.PuterAPI?.kv?.get) {
+        const v = await window.PuterAPI.kv.get('preferredModel');
+        if (v) return v;
+      }
+    } catch {}
+    return localStorage.getItem('preferredModel') || 'puter:gpt-5';
+  };
+  window.setPreferredModel = async (id) => {
+    try {
+      localStorage.setItem('preferredModel', id);
+      if (window.PuterAPI?.kv?.put) await window.PuterAPI.kv.put('preferredModel', id);
+    } catch {}
+    return id;
+  };
+
   // Listen for Puter sign-in events to refresh the selector
   window.addEventListener('puter:signin', () => {
     console.log('Puter signed in, refreshing AI selector...');

@@ -38,7 +38,26 @@
 
     --color-border: rgba(255,255,255,0.1); /* Subtle light borders on dark */
 }
-    
+
+/* Aliases to unify legacy tokens with new theme system */
+:root {
+  --color-bg-light: var(--color-bg-primary);
+  --color-bg-medium: var(--color-bg-secondary);
+  --color-bg-dark: var(--color-bg-tertiary);
+
+  --color-text-dark: var(--color-text-primary);
+  --color-text-medium: var(--color-text-secondary);
+  --color-text-light: var(--color-text-muted);
+
+  /* Ensure file tree uses appropriate background per theme */
+  --file-tree-bg: var(--color-bg-secondary);
+}
+
+[data-theme="dark"] {
+  --file-tree-bg: var(--color-bg-secondary);
+}
+
+
     --color-success-bg: #10B981; /* Green-500 */
     --color-success-text: #ffffff; /* Green-50 */
     --color-error-bg: #EF4444; /* Red-700 */
