@@ -354,34 +354,48 @@ export class ChatManager {
             };
             const completion = await this.requestAIResponse(aiRequestPayload);
 
-            // At this point, the AI has responded, so stop the *detailed* loading animation.
-            // The AI's message will then be processed and displayed.
-            this.stopLoadingAnimation();
+// At this point, the AI has responded, so stop the *detailed* loading animation.
+// The AI's message will then be processed and displayed.
+this.stopLoadingAnimation();
 
-            let parsedResponse;
-            try {
-                parsedResponse = JSON.parse(completion.content);
-            } catch (jsonError) {
-                console.error("Error parsing AI response JSON:", jsonError);
-                console.error("Raw AI response content:", completion.content);
+// Normalize response across providers (WebSim, Puter SDK, custom)
+let rawContent = '';
+try {
+    if (typeof completion === 'string') rawContent = completion;
+    else if (typeof completion?.content === 'string') rawContent = completion.content;
+    else if (typeof completion?.message === 'string') rawContent = completion.message;
+    else if (typeof completion?.text === 'string') rawContent = completion.text;
+    else if (completion?.choices?.[0]?.message?.content) rawContent = completion.choices[0].message.content;
+    else if (completion?.messages?.[0]?.content) rawContent = completion.messages[0].content;
+} catch {}
 
-                const fallbackResponse = this.extractFallbackResponse(completion.content);
-                if (fallbackResponse) {
-                    parsedResponse = fallbackResponse;
-                } else {
-                    parsedResponse = {
-                        message: "I apologize, but I encountered an issue with my response format. Please try again or rephrase your request.",
-                        files: {}
-                    };
-                }
-            }
+let parsedResponse;
+const looksLikeJson = rawContent && /\{[\s\S]*\}/.test(rawContent.trim());
+try {
+    if (looksLikeJson) parsedResponse = JSON.parse(rawContent);
+    else throw new Error('Non-JSON content');
+} catch (jsonError) {
+    console.warn('AI returned non-JSON content, using fallback message parsing.', jsonError);
+    if (!rawContent || !rawContent.trim()) {
+        // Try to extract JSON from any nested structure
+        const fallbackResponse = this.extractFallbackResponse(String(completion?.content || ''));
+        if (fallbackResponse) {
+            parsedResponse = fallbackResponse;
+        } else {
+            parsedResponse = { message: 'I could not parse a response from the AI provider. Please try again.', files: {} };
+        }
+    } else {
+        parsedResponse = { message: rawContent.trim(), files: {} };
+    }
+}
 
-            if (typeof parsedResponse.message !== 'string') {
-                parsedResponse.message = "I apologize, but I encountered an issue with my response format. Could you please rephrase your request?";
-            }
-            if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
-                parsedResponse.files = {};
-            }
+if (typeof parsedResponse.message !== 'string') {
+    parsedResponse.message = 'I apologize, but I encountered an issue with my response format. Could you please rephrase your request?';
+}
+if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
+    parsedResponse.files = {};
+}
+
 
             let speechResultUrl = null;
             if (this.app.speechEnabled) {
