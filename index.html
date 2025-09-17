@@ -8,8 +8,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <!-- Puter.js SDK (required by Puter integration) -->
     <script src="https://js.puter.com/v2/"></script>
-    <!-- Using unified puter_integration.js; legacy puter-init removed -->
-    
+    <!-- Puter quick initializer: auto-check sign-in, show click-to-sign-in banner, expose testing helpers -->
+    <script type="module" src="puter-init.js"></script>
+
     <!-- Monaco loader (AMD) for the in-browser Monaco Editor -->
     <script src="https://unpkg.com/monaco-editor@0.39.0/min/vs/loader.js"></script>
     
@@ -51,6 +52,12 @@
                   </div>
                 </div>
                 <div class="header-actions">
+                    <button class="theme-toggle" id="themeToggle">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/>
+                        </svg>
+                        <span id="themeText">Dark</span>
+                    </button>
                     <button class="btn btn-secondary" id="optionsBtn">
                         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.17.311a1.464 1.464 0 0 1 .872 2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.17a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2 0 1 0 0-5.86 2.929 2 0 0 0 0 5.86z"/>

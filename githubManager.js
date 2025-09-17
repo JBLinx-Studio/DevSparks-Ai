@@ -574,7 +574,7 @@ export class GitHubManager {
         return response.json();
     }
 
-    async uploadFile(owner, repo, filename, content) {
+    async uploadFile(owner, repo, filename, content, branch = 'main') {
         let encodedContent = '';
         const isMediaFile = filename.match(/\.(png|jpe?g|gif|svg|mp4|webm|ogg|mov|webp|ico|avif)$/i);
 
@@ -607,7 +607,7 @@ export class GitHubManager {
 
         let sha = null;
         try {
-            const getFileResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filename}?ref=main`, { // Explicitly target 'main' branch
+            const getFileResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filename}?ref=${branch}`, { // Support different branches
                 headers: {
                     'Authorization': `token ${this.githubToken}`,
                     'Accept': 'application/vnd.github.v3+json'
@@ -647,7 +647,7 @@ export class GitHubManager {
                 message: `Update ${filename} from DevSpark AI`,
                 content: encodedContent,
                 sha: sha,
-                branch: 'main'
+                branch: branch
             })
         });
 
@@ -662,7 +662,7 @@ export class GitHubManager {
             const errorData = await uploadResponse.json().catch(() => ({ message: errorMessage }));
             throw new Error(`${errorMessage} ${errorData.message ? `(${errorData.message})` : ''}`);
         } else {
-             this.app.addConsoleMessage('info', `Successfully uploaded ${filename} to GitHub.`);
+             this.app.addConsoleMessage('info', `Successfully uploaded ${filename} to GitHub ${branch} branch.`);
         }
     }
 }
