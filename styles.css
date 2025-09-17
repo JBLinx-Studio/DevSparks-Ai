@@ -11,31 +11,6 @@
     /* @tweakable [background / paper color for sketch effect] */ --color-paper: #ffffff;
     /* @tweakable [ink color for strokes] */ --color-ink: #000000;
     /* @tweakable [muted ink for lighter text] */ --color-ink-muted: #6b6b6b;
-    
-    --color-success-bg: #10B981; /* Green-500 */
-    --color-success-text: #ffffff; /* Green-50 */
-    --color-error-bg: #EF4444; /* Red-700 */
-    --color-error-text: #ffffff; /* Red-50 */
-    --color-warn-text: #F59E0B; /* Yellow-500 for warnings */
-    --color-info-text: #60A5FA; /* Blue-500 for info */
-    --color-debug-text: #9C27B0; /* Purple-500 for debug */
-
-    --spacing-xs: 4px;
-    --spacing-sm: 8px;
-    --spacing-md: 12px;
-    --spacing-lg: 16px;
-    --spacing-xl: 24px;
-    --spacing-2xl: 32px;
-
-    /* All corners are now square */
-    --border-radius: 0; /* square edges everywhere */
-    
-    --shadow-sm: 0 6px 18px rgba(0,0,0,0.12); /* stronger, crisp shadow */
-    --shadow-md: 0 14px 30px rgba(0,0,0,0.16);
-    --sidebar-width: 340px; /* increased width for Project Files panel */
-    --file-tree-bg: #1e1f26; /* dark file tree background */
-    --file-tree-font-size: 13px; /* more compact font for file tree */
-    --file-tree-padding: 8px; /* tighter padding for a denser tree */
 }
 
 /* Light theme (default) */
@@ -62,6 +37,32 @@
     --color-bg-tertiary: #2d2e3a; /* Darker headers/inputs */
 
     --color-border: rgba(255,255,255,0.1); /* Subtle light borders on dark */
+}
+    
+    --color-success-bg: #10B981; /* Green-500 */
+    --color-success-text: #ffffff; /* Green-50 */
+    --color-error-bg: #EF4444; /* Red-700 */
+    --color-error-text: #ffffff; /* Red-50 */
+    --color-warn-text: #F59E0B; /* Yellow-500 for warnings */
+    --color-info-text: #60A5FA; /* Blue-500 for info */
+    --color-debug-text: #9C27B0; /* Purple-500 for debug */
+
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --spacing-xl: 24px;
+    --spacing-2xl: 32px;
+
+    /* All corners are now square */
+    --border-radius: 0; /* square edges everywhere */
+    
+    --shadow-sm: 0 6px 18px rgba(0,0,0,0.12); /* stronger, crisp shadow */
+    --shadow-md: 0 14px 30px rgba(0,0,0,0.16);
+    --sidebar-width: 340px; /* increased width for Project Files panel */
+    --file-tree-bg: #1e1f26; /* dark file tree background */
+    --file-tree-font-size: 13px; /* more compact font for file tree */
+    --file-tree-padding: 8px; /* tighter padding for a denser tree */
 }
 
 * {
