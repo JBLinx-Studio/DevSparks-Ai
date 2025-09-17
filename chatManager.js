@@ -332,15 +332,21 @@ export class ChatManager {
             const conversationForAI = this.app.conversationHistory.slice(-12);
             const projectContext = this.analyzeProjectContext();
 
-            // determine tone/style based on selected model/provider
-            let selectedModel = 'websim';
-            try { selectedModel = (window.getPreferredModel && await window.getPreferredModel()) || window.__lastSelectedModel || selectedModel; } catch (e) { selectedModel = window.__lastSelectedModel || selectedModel; }
-            let preferredTone = 'professional, concise, and friendly';
-            if (/claude/i.test(selectedModel)) preferredTone = 'analytical and concise';
-            else if (/gpt-5-nano|gpt-5-mini|gpt-5-pro/i.test(selectedModel)) preferredTone = 'friendly, helpful, and pragmatic';
-            else if (/dall-e|dall·e|dalle/i.test(selectedModel)) preferredTone = 'visual-descriptive and image-focused (brief)';
-            else if (/gemini/i.test(selectedModel)) preferredTone = 'innovative and exploratory';
-            else if (/puter|puter-free|puter:/i.test(selectedModel)) preferredTone = 'professional and account-aware';
+            // determine tone/style based on selected model/provider (unified system)
+            let selectedModel = 'websim:gpt5-nano';
+            try { 
+                selectedModel = (window.getPreferredModel && await window.getPreferredModel()) || 
+                               window.__lastSelectedModel?.id || 
+                               this.app.aiProvider || 
+                               selectedModel; 
+            } catch (e) { 
+                selectedModel = window.__lastSelectedModel?.id || this.app.aiProvider || selectedModel; 
+            }
+            let preferredTone = 'professional, concise, and helpful';
+            if (/claude/i.test(selectedModel)) preferredTone = 'analytical and thoughtful';
+            else if (/openai|gpt/i.test(selectedModel)) preferredTone = 'friendly, helpful, and pragmatic';
+            else if (/deepseek/i.test(selectedModel)) preferredTone = 'precise and reasoning-focused';
+            else if (/websim/i.test(selectedModel)) preferredTone = 'professional and efficient';
 
             const systemPrompt = `You are an advanced AI assistant for VisionStack, a professional web development IDE and code editor application. You are highly intelligent, contextually aware, and capable of deep analysis and creative problem-solving. Your communication style is ${preferredTone}.\n\nWhen providing explanations or code snippets in your 'message' field, use GitHub-flavored Markdown (GFM) for formatting (e.g., \`\`\`html for code blocks, **bold**, *italics*, lists, etc.). This helps present information clearly within the chat interface.\n\nCURRENT USER CONTEXT:\n- Username: ${this.app.currentUser?.username || 'Guest'}\n- User ID: ${this.app.currentUser?.id || 'N/A'}\n- Avatar URL: ${this.app.currentUser?.avatar_url || 'N/A'}\n\nCORE INTELLIGENCE CAPABILITIES:\n- Deep understanding of web development patterns and best practices\n- Contextual awareness of user skill level and project complexity\n- Ability to analyze code quality and suggest improvements\n- Pattern recognition for common development issues\n- Adaptive communication based on user expertise\n- Proactive error prevention and optimization suggestions\n\nCURRENT PROJECT ANALYSIS:\n- Project: \"${this.app.currentProject?.name || 'No project loaded'}\"\n- Complexity: ${projectContext.projectComplexity}\n- Code Quality: ${projectContext.codeQuality}\n- User Skill Level: ${projectContext.userSkillLevel}\n- Last Intent: ${this.conversationContext.lastUserIntent}\n- Active File: ${this.app.currentFile || 'None'}\n- Files: [${Object.keys(this.app.currentFiles || {}).join(', ') || 'No files'}]\n\nINTERFACE STATE AWARENESS:\nDevSpark AI has a three-panel layout:\n1. LEFT SIDEBAR (280px): Project management, file tree (HTML/CSS/JS/Images categorized), GitHub integration\n2. CENTER CHAT: Our conversation area with speech controls and context menus\n3. RIGHT EDITOR: Tabbed interface (Code Editor/Console/Deployment) with live preview\n\nCurrent State:\n- Panel View: ${this.app.currentMainPanel} (code/console)\n- GitHub: ${this.app.githubManager?.githubToken ? `Connected (${this.app.githubManager.currentRepoInfo?.owner}/${this.app.githubManager.currentRepoInfo?.name})` : 'Disconnected'}\n- Speech: ${this.app.speechEnabled ? `Enabled (${this.app.voicePreference})` : 'Disabled'}\n- Projects: ${this.app.projects?.length || 0} total\n\nNEW: CLARIFICATION ON FILE EXECUTION IN PREVIEW\nIMPORTANT: The live preview in DevSpark AI directly renders HTML/CSS/JS in the browser.\nFiles like .ts, .tsx, .jsx require a *build step* (e.g., transpilation with Babel or TypeScript compiler, bundling with Vite/Webpack)\nto be converted into executable JavaScript for the browser.\nCurrently, DevSpark AI's live preview does *not* include an in-browser build step for these files.\nTherefore, while these files can be *edited*, their changes will NOT reflect in the live preview\nuntil they are explicitly compiled into standard JavaScript and linked in your HTML.\nPlease inform the user of this limitation if they inquire about their non-JS files not running.\n\nADVANCED RESPONSE STRATEGIES:\n1. CONTEXTUAL ADAPTATION: Adjust explanations based on user skill level\n   - Beginner: Detailed explanations with learning opportunities\n   - Intermediate: Balanced technical depth with practical examples\n   - Advanced: Concise, technical responses with optimization focus\n\n2. PROACTIVE ASSISTANCE: Anticipate needs and suggest improvements\n   - Identify potential issues before they occur\n   - Suggest modern alternatives to outdated practices\n   - Recommend performance optimizations\n   - Propose accessibility improvements\n\n3. INTELLIGENT CODE GENERATION:\n   - Follow established patterns in the current project\n   - Ensure consistency with existing code style\n   - Add helpful comments for learning\n   - Include error handling and edge cases\n   - Use modern ES6+ JavaScript features appropriately\n\n4. QUALITY ASSURANCE:\n   - Validate HTML semantics and accessibility\n   - Ensure responsive design principles\n   - Follow CSS best practices (BEM, custom properties)\n   - Implement proper JavaScript patterns\n   - Add appropriate meta tags and SEO considerations\n\nENHANCED CAPABILITIES:\n- Generate complete, production-ready applications\n- Debug complex issues with detailed analysis\n- Optimize performance with specific recommendations\n- Create responsive, accessible, modern designs\n- Generate relevant images and assets\n- Provide learning-oriented explanations\n- Suggest project structure improvements\n- Help with GitHub workflow optimization\n\nIMAGE GENERATION CAPABILITY:\nIf the user explicitly asks you to generate an image or create a picture (e.g., "generate an image of a cat", "draw a sunset", "show me a picture of a futuristic city"), you must respond with a JSON object that includes an "action" field. This action field tells DevSpark AI to initiate an image generation process.\n\nExample JSON response for image generation:\n{\n    "message": "Alright! I've generated an image based on your request. Take a look!",\n    "files": {}, // Important: Do NOT include any file changes when generating an image\n    "action": {\n        "type": "generate_image",\n        "prompt": "<THE_DESCRIPTIVE_IMAGE_PROMPT_HERE>" // This prompt will be used for image generation\n    }\n}\nEnsure the 'prompt' in the 'action' field is descriptive and captures the essence of the user's image request. After this response, the DevSpark AI application will handle the image generation and display it to the user.\n\nVIDEO GENERATION CAPABILITY:\nIf the user explicitly asks you to generate a video or create a clip (e.g., "generate a video of a busy street", "make a clip of a dog running", "show me a video of a sci-fi landscape"), you must respond with a JSON object that includes an "action" field. This action field tells DevSpark AI to initiate a video generation process.\n\nExample JSON response for video generation:\n{\n    "message": "Excellent! I'm creating a video based on your request. Please bear with me for a moment...",\n    "files": {}, // Important: Do NOT include any file changes when generating a video\n    "action": {\n        "type": "generate_video",\n        "prompt": "<THE_DESCRIPTIVE_VIDEO_PROMPT_HERE>" // This prompt will be used for video generation\n    }\n}\nEnsure the 'prompt' in the 'action' field is descriptive and captures the essence of the user's image/video request. After this response, the DevSpark AI application will handle the media generation and display it to the user.\n\nRESPONSE FORMAT (CRITICAL):\nAlways respond with valid JSON containing "message" and "files" keys, and optionally an "action" key for image/video generation.\n{\n    "message": "Your intelligent, contextual response here (use GFM markdown for formatting code snippets, **bold**, *italics*, etc.)",\n    "files": {\n        "filename.ext": "content or URL" // Omit or provide empty object if an action is present\n    },\n    "action"?: { // Optional field for specific actions\n        "type": "generate_image" | "generate_video",\n        "prompt": "..." // This prompt will be used for image/video generation\n    }\n}\n\nINTELLIGENT CONVERSATION GUIDELINES:\n- Be proactive: Suggest improvements even when not explicitly asked\n- Be educational: Explain the "why" behind your decisions\n- Be efficient: Provide complete solutions that work immediately\n-- Be modern: Use current best practices and technologies\n- Be aware: Reference the current project state and user patterns\n- Be helpful: Anticipate follow-up questions and provide comprehensive answers\n- **Response Tone:** Be professional and concise, but also friendly and approachable. Use a casual tone where appropriate, avoiding overly formal language.\n\nRemember: You're not just generating code, you're being an intelligent development partner who understands the project, the user, and the goals. Think deeply, provide value, and enhance the development experience.`;
 
@@ -572,7 +578,8 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
     async requestAIResponse(payload) {
         try {
             // Prefer the user's selected model (Puter KV / localStorage) when available
-            const pref = (window.getPreferredModel) ? await window.getPreferredModel() : (this.app.aiProvider || 'websim:gpt5-nano');
+            // Use unified AI provider system - check both AI selector and app.aiProvider
+            const pref = (window.getPreferredModel) ? await window.getPreferredModel() : null;
             const providerId = pref || (this.app.aiProvider || 'websim:gpt5-nano');
             const [backend, model] = (providerId || 'websim:gpt5-nano').split(':');
 
@@ -585,19 +592,36 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
 
             // Puter routing: support multiple surfaces (PuterService, Puter, PuterAPI)
             if (backend === 'puter') {
-                // Prefer PuterService if present (legacy expectation)
+                // Prefer PuterService if present - route to specific models
                 if (window.PuterService?.ai?.chat) {
-                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                    let puterModel = model || 'gpt-4o-mini'; // Default
+                    
+                    // Map our unified model IDs to actual Puter model names  
+                    if (model === 'openai') puterModel = 'gpt-4o-mini';
+                    else if (model === 'claude-35-sonnet') puterModel = 'claude-3-5-sonnet-20241022';
+                    else if (model === 'deepseek') puterModel = 'deepseek-chat';
+                    
+                    const opts = { model: puterModel, messages: payload.messages, json: payload.json };
                     return await window.PuterService.ai.chat(opts);
                 }
                 // Fallback to Puter SDK directly
                 if (window.Puter?.ai?.chat) {
-                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                    let puterModel = model || 'gpt-4o-mini';
+                    if (model === 'openai') puterModel = 'gpt-4o-mini';
+                    else if (model === 'claude-35-sonnet') puterModel = 'claude-3-5-sonnet-20241022';
+                    else if (model === 'deepseek') puterModel = 'deepseek-chat';
+                    
+                    const opts = { model: puterModel, messages: payload.messages, json: payload.json };
                     return await window.Puter.ai.chat(opts);
                 }
                 // Fallback to PuterAPI shim
                 if (window.PuterAPI?.ai?.chat) {
-                    const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                    let puterModel = model || 'gpt-4o-mini';
+                    if (model === 'openai') puterModel = 'gpt-4o-mini';
+                    else if (model === 'claude-35-sonnet') puterModel = 'claude-3-5-sonnet-20241022';
+                    else if (model === 'deepseek') puterModel = 'deepseek-chat';
+                    
+                    const opts = { model: puterModel, messages: payload.messages, json: payload.json };
                     return await window.PuterAPI.ai.chat(opts);
                 }
             }

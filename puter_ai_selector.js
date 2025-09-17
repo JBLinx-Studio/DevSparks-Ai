@@ -1,31 +1,19 @@
-// Enhanced AI model selector UI — searchable, grouped, icons, presets, keyboard nav, saves to Puter KV + localStorage
-// Comprehensive list of available AI models including Puter's free offerings
+// Unified AI model selector - connects Settings and AI Assistant dropdowns
+// Only includes WebSim main AI and Puter's 3 specific free unlimited models
 const MODELS = [
-  // Puter.AI Free Models (comprehensive list)
-  {id: 'puter:gpt-5', label: 'GPT-5', provider: 'Puter.AI', desc: 'Latest OpenAI model - free via Puter', category: 'puter'},
-  {id: 'puter:gpt-4o', label: 'GPT-4o', provider: 'Puter.AI', desc: 'Advanced OpenAI model - free via Puter', category: 'puter'},
-  {id: 'puter:claude-4-sonnet', label: 'Claude 4 Sonnet', provider: 'Puter.AI', desc: 'Advanced Claude model - free via Puter', category: 'puter'},
-  {id: 'puter:claude-4-opus', label: 'Claude 4 Opus', provider: 'Puter.AI', desc: 'Most capable Claude model - free via Puter', category: 'puter'},
-  {id: 'puter:deepseek-chat', label: 'DeepSeek Chat', provider: 'Puter.AI', desc: 'Advanced reasoning model - free via Puter', category: 'puter'},
-  {id: 'puter:deepseek-reasoner', label: 'DeepSeek Reasoner', provider: 'Puter.AI', desc: 'Complex reasoning specialist - free via Puter', category: 'puter'},
-  {id: 'puter:gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Puter.AI', desc: 'Fast Google model - free via Puter', category: 'puter'},
-  {id: 'puter:llama-3.3-70b', label: 'Llama 3.3 70B', provider: 'Puter.AI', desc: 'Meta\'s powerful model - free via Puter', category: 'puter'},
-  {id: 'puter:openrouter-auto', label: 'OpenRouter Auto', provider: 'Puter.AI', desc: 'Best available model - free via Puter', category: 'puter'},
+  // WebSim AI (Main)
+  {id: 'websim:gpt5-nano', label: 'WebSim AI', provider: 'WebSim', desc: 'Default WebSim assistant - fast and efficient', category: 'websim'},
 
-  // WebSim Fallback Models
-  {id: 'websim:gpt-5-nano', label: 'GPT-5 Nano', provider: 'WebSim', desc: 'Fast, efficient assistant', category: 'websim'},
-  {id: 'websim:gpt-5-mini', label: 'GPT-5 Mini', provider: 'WebSim', desc: 'Balanced speed & quality', category: 'websim'},
-  {id: 'websim:claude', label: 'Claude (WebSim)', provider: 'WebSim', desc: 'Helpful instruction-following', category: 'websim'},
-
-  // Custom/Other
-  {id: 'custom', label: 'Custom Model', provider: 'Custom', desc: 'User-defined model endpoint', category: 'other'}
+  // Puter.AI Free Unlimited Models (from official tutorials)
+  {id: 'puter:openai', label: 'OpenAI GPT', provider: 'Puter.AI', desc: 'Free unlimited OpenAI API via Puter', category: 'puter'},
+  {id: 'puter:claude-35-sonnet', label: 'Claude 3.5 Sonnet', provider: 'Puter.AI', desc: 'Free unlimited Claude 3.5 Sonnet via Puter', category: 'puter'},
+  {id: 'puter:deepseek', label: 'DeepSeek', provider: 'Puter.AI', desc: 'Free unlimited DeepSeek API via Puter', category: 'puter'}
 ];
 
 /* @tweakable [Labels for selector groups: shown as headings inside the model list] */
 const AI_SELECTOR_GROUP_LABELS = {
-  puter: '🟢 Puter.AI (Free & Unlimited)',
-  websim: '🔄 WebSim (Fallback)',
-  other: '⚙️ Custom & Other'
+  websim: '🌐 WebSim AI',
+  puter: '🟢 Puter.AI (Free & Unlimited)'
 };
 
 /* @tweakable [Minimum width for the model badge button (px) — helps align inside header] */
@@ -66,35 +54,22 @@ function createSelector() {
   search.style.fontSize = '14px';
   panel.appendChild(search);
 
-  // list container
+  // Simple list container (no footer needed)
   const list = document.createElement('div');
   list.style.maxHeight = '240px';
   list.style.overflow = 'auto';
   panel.appendChild(list);
 
-  // footer: add custom model
-  const footer = document.createElement('div');
-  footer.style.display = 'flex';
-  footer.style.gap = '8px';
-  footer.style.marginTop = '8px';
-  const addBtn = document.createElement('button');
-  addBtn.className = 'btn btn-secondary btn-sm';
-  addBtn.textContent = 'Add Custom Model';
-  footer.appendChild(addBtn);
-  panel.appendChild(footer);
-
   // helpers to render list
   function renderItems(filter='') {
     list.innerHTML = '';
     // categorize models by their category
-    const groups = { puter: [], websim: [], other: [] };
+    const groups = { websim: [], puter: [] };
     MODELS.forEach(m=>{
       if (filter && !`${m.label} ${m.provider} ${m.desc} ${m.id}`.toLowerCase().includes(filter.toLowerCase())) return;
-      const category = m.category || 'other';
+      const category = m.category || 'websim';
       if (groups[category]) {
         groups[category].push(m);
-      } else {
-        groups.other.push(m);
       }
     });
 
@@ -146,10 +121,9 @@ function createSelector() {
       list.appendChild(sep);
     };
 
-    // order: Puter.AI (prioritized), WebSim, then Other
-    appendGroup(AI_SELECTOR_GROUP_LABELS.puter, groups.puter);
+    // order: WebSim first (default), then Puter.AI
     appendGroup(AI_SELECTOR_GROUP_LABELS.websim, groups.websim);
-    appendGroup(AI_SELECTOR_GROUP_LABELS.other, groups.other);
+    appendGroup(AI_SELECTOR_GROUP_LABELS.puter, groups.puter);
 
     if (!list.children.length) {
       const empty = document.createElement('div');
@@ -162,10 +136,14 @@ function createSelector() {
 
   // selection logic
   async function loadPreferred() {
-    let pref = 'puter:gpt-5'; // Default to Puter's best free model
+    let pref = 'websim:gpt5-nano'; // Default to WebSim
     try { pref = (window.getPreferredModel && await window.getPreferredModel()) || localStorage.getItem('preferredModel') || pref; } catch {}
     const found = MODELS.find(m=>m.id===pref) || MODELS[0];
     updateBadge(found);
+    // Sync with app.js AI provider system
+    if (window.app && window.app.selectAIProvider) {
+      window.app.selectAIProvider(found.id);
+    }
     return found;
   }
   function updateBadge(m) {
@@ -193,8 +171,13 @@ function createSelector() {
     window.__lastSelectedModel = model;
     console.info('Preferred model set to', id);
 
+    // Sync with app.js AI provider system (unify the two dropdowns)
+    if (window.app && window.app.selectAIProvider) {
+      window.app.selectAIProvider(id);
+    }
+
     // Apply speaking style hint to global app (chatManager should listen for this)
-    const suggestedStyle = MODEL_SPEECH_MAP[id] || 'casual';
+    const suggestedStyle = MODEL_SPEECH_MAP[id] || 'professional';
     try {
       // setPreferredAssistantStyle is optional hook consumed by chatManager/app
       if (window.setPreferredAssistantStyle) window.setPreferredAssistantStyle(suggestedStyle);
@@ -222,14 +205,8 @@ function createSelector() {
     }
   });
 
-  addBtn.addEventListener('click', async ()=> {
-    const custom = prompt('Enter custom model id (e.g. myorg/gpt-xyz)'); if (!custom) return;
-    const label = prompt('Label for this model', custom) || custom;
-    const entry = { id: custom, label, provider: 'Custom', desc: 'User added' };
-    MODELS.unshift(entry);
-    await selectModel(custom);
-    renderItems(search.value);
-  });
+  // Remove custom model functionality to keep it clean and simple
+  addBtn.style.display = 'none';
 
   // keyboard: open with Alt+M, cycle with arrow keys when open
   document.addEventListener('keydown', (e)=> {
@@ -255,7 +232,7 @@ function createSelector() {
         if (v) return v;
       }
     } catch {}
-    return localStorage.getItem('preferredModel') || 'puter:gpt-5';
+    return localStorage.getItem('preferredModel') || 'websim:gpt5-nano';
   };
   window.setPreferredModel = async (id) => {
     try {

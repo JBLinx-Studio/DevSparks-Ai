@@ -72,18 +72,13 @@ export class App {
             { id: "hi-male", name: "Hindi (Male)" }
         ];
 
-        // Pre-populate a curated list of selectable assistants (either Websim or Puter-hosted models).
-        // Use provider id format "<backend>:<model>" where backend is "websim" or "puter".
+        // Unified AI providers - matches the AI selector dropdown exactly
         this.availableAIProviders = [
-            { id: 'websim', name: 'Websim AI (Default)' }
+            { id: 'websim:gpt5-nano', name: 'WebSim AI' },
+            { id: 'puter:openai', name: 'OpenAI GPT (Puter.AI - Free)' },
+            { id: 'puter:claude-35-sonnet', name: 'Claude 3.5 Sonnet (Puter.AI - Free)' },
+            { id: 'puter:deepseek', name: 'DeepSeek (Puter.AI - Free)' }
         ];
-
-        // add Puter provider option so users can select it in Settings (frontend-only if PuterService present)
-        this.availableAIProviders.push({ id: 'puter:default', name: 'Puter AI (Account)' });
-        this.availableAIProviders.push({ id: 'puter:kimmy-k2', name: 'Kimmy K2 (Puter)' });
-        this.availableAIProviders.push({ id: 'puter:gemini-2.5-flash', name: 'Gemini 2.5 Flash (Puter)' });
-        this.availableAIProviders.push({ id: 'websim:gpt5-mini', name: 'gpt5 Mini (Websim)' });
-        this.availableAIProviders.push({ id: 'websim:gpt5-nano', name: 'gpt5 Nano (Websim - default)' });
 
         // Load persisted AI provider selection (fallback to websim:gpt5-nano)
         this.aiProvider = localStorage.getItem('aiProvider') || 'websim:gpt5-nano';
@@ -1754,6 +1749,19 @@ export class App {
         this.aiProvider = providerId;
         this.saveAIPreferences();
         this.updateAIProviderControlsUI();
+        
+        // Sync with AI selector dropdown (unify both systems)
+        if (window.setPreferredModel) {
+            window.setPreferredModel(providerId);
+        } else {
+            localStorage.setItem('preferredModel', providerId);
+        }
+        
+        // Update AI selector badge if it exists
+        if (window.pickModel) {
+            window.pickModel(providerId);
+        }
+        
         this.addConsoleMessage('info', `AI Provider changed to: ${this.availableAIProviders.find(p => p.id === providerId)?.name || providerId}`);
     }
 
