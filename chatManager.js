@@ -592,33 +592,22 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
 
             // Puter routing: support multiple surfaces (PuterService, Puter, PuterAPI)
             if (backend === 'puter') {
-                try {
-                    if (!window.Puter?.auth?.currentUser && window.PuterShim?.ensureSignedInInteractive) {
-                        await window.PuterShim.ensureSignedInInteractive();
-                    }
-                } catch(_) {}
-                const providerMap = {
-                    'openai': { provider: 'openai', defaults: ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'] },
-                    'claude-35-sonnet': { provider: 'anthropic', defaults: ['claude-3-5-sonnet-20241022', 'claude-3-5-sonnet-20240620', 'claude-3-5-sonnet'] },
-                    'deepseek': { provider: 'deepseek', defaults: ['deepseek-reasoner', 'deepseek-chat'] }
+                // Build model variants for robust compatibility across Puter surfaces
+                const getVariants = (m) => {
+                    if (m === 'openai') return ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
+                    if (m === 'claude-35-sonnet') return ['claude-3-5-sonnet-20240620', 'claude-3-5-sonnet-20241022', 'claude-3-5-sonnet'];
+                    if (m === 'deepseek') return ['deepseek-chat', 'deepseek-reasoner'];
+                    return [m || 'gpt-4o-mini'];
                 };
-                const entry = providerMap[model] || { provider: undefined, defaults: [model || 'gpt-4o-mini'] };
-                const variants = entry.defaults;
+                const variants = getVariants(model);
 
                 // Helper to try a list of models against a given chat function
                 const trySurface = async (chatFn) => {
                     for (const mv of variants) {
                         try {
-                            // 1) Try with model only
-                            const baseOpts = { model: mv, messages: payload.messages, json: payload.json };
-                            let res = await chatFn(baseOpts);
+                            const opts = { model: mv, messages: payload.messages, json: payload.json };
+                            const res = await chatFn(opts);
                             if (res) return res;
-                        } catch (_) { /* try provider form next */ }
-                        try {
-                            // 2) Try with explicit provider hint (some Puter SDK builds require it)
-                            const optsWithProvider = { provider: entry.provider, model: mv, messages: payload.messages, json: payload.json };
-                            let res2 = await chatFn(optsWithProvider);
-                            if (res2) return res2;
                         } catch (_) { /* try next variant */ }
                     }
                     return null;
