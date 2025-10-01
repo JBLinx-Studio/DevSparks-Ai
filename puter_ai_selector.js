@@ -1,9 +1,9 @@
 // Unified AI model selector - WebSim, Puter.AI, and Lovable AI (FREE Gemini!)
 const MODELS = [
-  // 🆓 Lovable AI - FREE Gemini Models (Sept 29 - Oct 6)
-  {id: 'lovable:gemini-flash', label: '⚡ Gemini 2.5 Flash', provider: 'Lovable AI', desc: '🆓 FREE - Fast & balanced (default)', category: 'lovable', isFree: true},
-  {id: 'lovable:gemini-pro', label: '🚀 Gemini 2.5 Pro', provider: 'Lovable AI', desc: '🆓 FREE - Most capable, complex reasoning', category: 'lovable', isFree: true},
-  {id: 'lovable:gemini-lite', label: '⚡ Gemini 2.5 Lite', provider: 'Lovable AI', desc: '🆓 FREE - Ultra-fast, simple tasks', category: 'lovable', isFree: true},
+  // Lovable AI - FREE Gemini Models (Sept 29 - Oct 6)
+  {id: 'lovable:gemini-flash', label: 'Gemini 2.5 Flash', provider: 'Lovable AI', desc: 'FREE - Fast & balanced (default)', category: 'lovable', isFree: true},
+  {id: 'lovable:gemini-pro', label: 'Gemini 2.5 Pro', provider: 'Lovable AI', desc: 'FREE - Most capable, complex reasoning', category: 'lovable', isFree: true},
+  {id: 'lovable:gemini-lite', label: 'Gemini 2.5 Lite', provider: 'Lovable AI', desc: 'FREE - Ultra-fast, simple tasks', category: 'lovable', isFree: true},
   
   // WebSim AI (Main)
   {id: 'websim:gpt5-nano', label: 'WebSim AI', provider: 'WebSim', desc: 'Default WebSim assistant', category: 'websim'},
@@ -16,9 +16,9 @@ const MODELS = [
 
 /* @tweakable [Labels for selector groups: shown as headings inside the model list] */
 const AI_SELECTOR_GROUP_LABELS = {
-  lovable: '🆓 Lovable AI (FREE Gemini - Limited Time!)',
-  websim: '🌐 WebSim AI',
-  puter: '🟢 Puter.AI (Free & Unlimited)'
+  lovable: 'Lovable AI (FREE Gemini - Limited Time)',
+  websim: 'WebSim AI',
+  puter: 'Puter.AI (Free & Unlimited)'
 };
 
 /* @tweakable [Minimum width for the model badge button (px) — helps align inside header] */
@@ -72,7 +72,7 @@ function createSelector() {
       const option = document.createElement('option');
       option.value = m.id;
       option.textContent = `${m.label} - ${m.desc}`;
-      if (m.isFree) option.textContent = `🆓 ${option.textContent}`;
+      // no emoji prefixes to keep UI clean
       optgroup.appendChild(option);
     });
     select.appendChild(optgroup);

@@ -693,15 +693,24 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
 
         // Define provider call functions
         const callLovableAI = async () => {
-            const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL;
-            if (!supabaseUrl) throw new Error('Lovable AI not configured');
-            
-            const response = await fetch(`${supabaseUrl}/functions/v1/lovable-ai-chat`, {
+            const FUNCTIONS_URL = 'https://dtwyytscuoyrbhajkbyk.functions.supabase.co/lovable-ai-chat';
+            const response = await fetch(FUNCTIONS_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY}`
-                },
+                headers: { 'Content-Type': 'application/json' }, // public function (verify_jwt=false)
+                body: JSON.stringify({
+                    messages: payload.messages,
+                    model: modelInfo.model
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Lovable AI error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content || data.content || '';
+        };
                 body: JSON.stringify({
                     messages: payload.messages,
                     model: modelInfo.model
