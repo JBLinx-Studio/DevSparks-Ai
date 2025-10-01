@@ -431,10 +431,8 @@ export class ChatManager {
 
             const aiRequestPayload = {
                 messages: [
-                    { role: 'system', content: systemPrompt + "\n" + ATTRIBUTION_SYSTEM_GUIDE },
                     ...conversationForAI
-                ],
-                json: true
+                ]
             };
             const completion = await this.requestAIResponse(aiRequestPayload);
 
