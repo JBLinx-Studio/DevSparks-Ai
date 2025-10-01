@@ -20,7 +20,7 @@ serve(async (req) => {
 
     // Default to free Gemini Flash model
     const selectedModel = model || "google/gemini-2.5-flash";
-    console.log('🤖 Using model:', selectedModel);
+    console.log('🤖 Using Google Gemini model:', selectedModel);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -33,7 +33,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: "You are VisionStack’s professional assistant. Respond in plain, human-readable text only. Do not include JSON, code blocks, or 'AI Thoughts' unless the user explicitly asks for code. Keep answers concise, actionable, and free of inner reasoning or meta commentary."
+            content: "You are VisionStack's AI assistant, powered by Google Gemini. Respond naturally and professionally in plain text. Do not wrap responses in JSON or code blocks unless the user explicitly asks for code. Keep answers clear, concise, and directly helpful. When asked 'hello' or similar greetings, respond warmly and ask how you can help with their web development project."
           },
           ...messages,
         ],
@@ -65,7 +65,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log('✅ Success! Returning response');
+    console.log('✅ Success! Google Gemini response received');
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
