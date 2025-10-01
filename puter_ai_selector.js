@@ -8,10 +8,11 @@ const MODELS = [
   // WebSim AI (Main)
   {id: 'websim:gpt5-nano', label: 'WebSim AI', provider: 'WebSim', desc: 'Default WebSim assistant', category: 'websim'},
 
-  // Puter.AI Free Unlimited Models
-  {id: 'puter:openai', label: 'OpenAI GPT', provider: 'Puter.AI', desc: 'Free unlimited OpenAI via Puter', category: 'puter'},
-  {id: 'puter:claude-35-sonnet', label: 'Claude 3.5 Sonnet', provider: 'Puter.AI', desc: 'Free unlimited Claude via Puter', category: 'puter'},
-  {id: 'puter:deepseek', label: 'DeepSeek', provider: 'Puter.AI', desc: 'Free unlimited DeepSeek via Puter', category: 'puter'}
+  // Puter.AI Free Unlimited Models (aligned with chatManager.js)
+  {id: 'puter:gpt-5', label: 'OpenAI GPT‑5 (via Puter)', provider: 'Puter.AI', desc: 'Free unlimited via Puter', category: 'puter'},
+  {id: 'puter:claude-sonnet', label: 'Claude Sonnet (via Puter)', provider: 'Puter.AI', desc: 'Free unlimited via Puter', category: 'puter'},
+  {id: 'puter:deepseek-r1', label: 'DeepSeek R1 (via Puter)', provider: 'Puter.AI', desc: 'Free unlimited via Puter', category: 'puter'},
+  {id: 'puter:llama-3.3', label: 'Llama 3.3 70B (via Puter)', provider: 'Puter.AI', desc: 'Free unlimited via Puter', category: 'puter'}
 ];
 
 /* @tweakable [Labels for selector groups: shown as headings inside the model list] */
@@ -115,6 +116,19 @@ function createSelector() {
     
     window.__lastSelectedModel = model;
     console.info('✓ AI Model changed to:', model.label, `(${model.provider})`);
+
+    // If a Puter model is selected, auto-prompt sign-in only here (no other UI prompts)
+    if (id.startsWith('puter:')) {
+      const signedIn = !!(window.Puter?.auth?.currentUser);
+      if (!signedIn && window.Puter?.auth?.signIn) {
+        try {
+          await window.Puter.auth.signIn();
+          window.dispatchEvent(new CustomEvent('puter:signin', { detail: window.Puter?.auth?.currentUser || null }));
+        } catch (err) {
+          console.warn('Puter sign-in cancelled or failed', err);
+        }
+      }
+    }
 
     // Sync with app.js
     if (window.app && window.app.selectAIProvider) {

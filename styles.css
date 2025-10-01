@@ -1135,8 +1135,8 @@ html, body, .sidebar, .chat-messages, .console-output,
 }
 
 .message.assistant .message-content {
-    background: var(--color-bg-secondary); /* Lighter background for better contrast */
-    color: var(--color-text-primary); /* Ensure text is visible */
+    background: var(--color-bg-dark); /* Darker background for better contrast */
+    color: var(--color-text-dark);
 }
 
 .message-content pre code {
@@ -2696,15 +2696,10 @@ html, body, .sidebar, .chat-messages, .console-output,
 
 /* NEW: Reasonings Panel Styles */
 .reasonings-panel {
-    background: var(--color-bg-dark);
-    border-top: 1px solid var(--color-border);
-    padding: 8px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex-shrink: 0;
-    /* moved to near input so don't force large height */
+    display: none !important;
 }
+/* Hide Puter account section in settings */
+#puterAccountSection { display: none !important; }
 .reasonings-panel.compact {
     font-size: 12px;
     line-height: 1.25;

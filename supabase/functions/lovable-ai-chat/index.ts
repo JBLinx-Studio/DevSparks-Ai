@@ -31,9 +31,9 @@ serve(async (req) => {
       body: JSON.stringify({
         model: selectedModel,
         messages: [
-          { 
-            role: "system", 
-            content: "You are a helpful AI assistant for VisionStack IDE. Provide concise, practical coding help." 
+          {
+            role: "system",
+            content: "You are VisionStack’s professional assistant. Respond in plain, human-readable text only. Do not include JSON, code blocks, or 'AI Thoughts' unless the user explicitly asks for code. Keep answers concise, actionable, and free of inner reasoning or meta commentary."
           },
           ...messages,
         ],
