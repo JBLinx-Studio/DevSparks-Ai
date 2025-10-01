@@ -684,9 +684,10 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
             'lovable:gemini-pro': { provider: 'lovable', model: 'google/gemini-2.5-pro' },
             'lovable:gemini-lite': { provider: 'lovable', model: 'google/gemini-2.5-flash-lite' },
             'websim:gpt5-nano': { provider: 'websim', model: null },
-            'puter:openai': { provider: 'puter', model: 'gpt-4o' },
-            'puter:claude-35-sonnet': { provider: 'puter', model: 'claude-3.5-sonnet' },
-            'puter:deepseek': { provider: 'puter', model: 'deepseek-chat' }
+            'puter:gpt-5': { provider: 'puter', model: 'gpt-5' },
+            'puter:claude-sonnet': { provider: 'puter', model: 'claude-sonnet-4-20250514' },
+            'puter:deepseek-r1': { provider: 'puter', model: 'deepseek-r1' },
+            'puter:llama-3.3': { provider: 'puter', model: 'llama-3.3-70b' }
         };
 
         const modelInfo = modelMap[selectedModel] || { provider: 'lovable', model: 'google/gemini-2.5-flash' };
@@ -726,11 +727,36 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
         };
 
         const callPuter = async () => {
-            if (window.PuterAPI?.ai?.chat) return await window.PuterAPI.ai.chat(payload);
-            if (window.PuterService?.ai?.chat) return await window.PuterService.ai.chat(payload);
-            if (window.Puter?.ai?.chat) return await window.Puter.ai.chat(payload);
-            if (window.PuterShim?.ai?.chat) return await window.PuterShim.ai.chat(payload);
-            throw new Error('Puter AI not available');
+            console.log('🟣 Calling Puter AI with model:', modelInfo.model);
+            
+            // Build Puter-compatible payload
+            const puterPayload = {
+                model: modelInfo.model,
+                messages: payload.messages,
+                stream: false
+            };
+
+            // Try various Puter AI interfaces
+            let result;
+            if (window.Puter?.ai?.chat) {
+                result = await window.Puter.ai.chat(puterPayload);
+            } else if (window.PuterAPI?.ai?.chat) {
+                result = await window.PuterAPI.ai.chat(puterPayload);
+            } else if (window.PuterService?.ai?.chat) {
+                result = await window.PuterService.ai.chat(puterPayload);
+            } else {
+                throw new Error('Puter AI not available - please sign in to Puter.AI');
+            }
+
+            console.log('✅ Puter AI response:', result);
+            
+            // Extract content from Puter response format
+            if (typeof result === 'string') return result;
+            if (result?.choices?.[0]?.message?.content) return result.choices[0].message.content;
+            if (result?.content) return result.content;
+            if (result?.message) return result.message;
+            
+            throw new Error('Invalid Puter AI response format');
         };
 
         // Auto-fallback rotation: try selected provider first, then rotate through others
