@@ -273,56 +273,15 @@ export class App {
     updatePuterStatusUI() {
         const statusDiv = document.getElementById('cloudStorageStatus');
         if (statusDiv) {
-            // Treat Puter as connected only when an authenticated user is present and/or FS is reachable
-            const user = this.puterUser || (window.PuterShim && window.PuterShim.user) || (window.Puter && window.Puter.auth && window.Puter.auth.currentUser);
-            const fsAvailable = !!(window.Puter && window.Puter.fs && (typeof window.Puter.fs.listFiles === 'function' || typeof window.Puter.fs.readJson === 'function'));
-            const actuallyConnected = Boolean(user && (fsAvailable || (window.PuterShim && window.PuterShim.isInitialized)));
-            if (actuallyConnected) {
-                statusDiv.textContent = `Cloud Storage: Connected (Puter.AI${user ? ` - ${user.username || user.id}` : ''})`;
+            // Treat PuterShim initialization as "connected" for UI (avoids persistent Local warning)
+            const puterAvailable = this.puterEnabled || (window.PuterShim && window.PuterShim.isInitialized);
+            if (puterAvailable) {
+                statusDiv.textContent = `Cloud Storage: Connected (Puter.AI${this.puterUser ? ` - ${this.puterUser.username}` : ''})`;
                 statusDiv.className = 'cloud-storage-status connected';
             } else {
                 statusDiv.textContent = 'Cloud Storage: Local (Puter.AI not connected)';
                 statusDiv.className = 'cloud-storage-status disconnected';
             }
-        }
-
-        // --- Sync bottom-right Puter notice so all three indicators reflect same state ---
-        /* @tweakable [CSS selector for the bottom-right Puter notice element (used to sync status across UI)] */
-        this._puterBottomSelector = this._puterBottomSelector || '#puterBottomNotice';
-        const bottomEl = document.querySelector(this._puterBottomSelector);
-        if (bottomEl) {
-            if (this.puterUser || (window.PuterShim && window.PuterShim.user)) {
-                bottomEl.textContent = `Puter: Connected — ${ (this.puterUser && this.puterUser.username) || (window.PuterShim && window.PuterShim.user?.username) || 'user' }`;
-                bottomEl.className = 'puter-bottom-notice connected';
-            } else if (window.Puter && !(this.puterUser)) {
-                bottomEl.textContent = 'Puter: Signing in…';
-                bottomEl.className = 'puter-bottom-notice signing';
-            } else {
-                bottomEl.textContent = 'Puter: Not connected (click to sign in)';
-                bottomEl.className = 'puter-bottom-notice disconnected';
-            }
-            bottomEl.style.zIndex = (this._puterBottomZIndex || 700);
-        }
-
-        // Listen for shared status update events and mirror them (keeps everything in sync from integration modules)
-        if (!this._puterStatusEventBound) {
-            window.addEventListener('puter:status-updated', (ev) => {
-                try {
-                    const payload = ev.detail || {};
-                    const text = payload.text || '';
-                    const state = payload.state || 'disconnected';
-                    const sel = this._puterBottomSelector || '#puterBottomNotice';
-                    const el = document.querySelector(sel);
-                    if (el) {
-                        el.textContent = text;
-                        el.className = `puter-bottom-notice ${state}`;
-                    }
-                    // also update cloud badge/options
-                    if (document.getElementById('cloudStorageStatus')) document.getElementById('cloudStorageStatus').textContent = payload.cloudText || document.getElementById('cloudStorageStatus').textContent;
-                    if (document.getElementById('puterAccountStatus')) document.getElementById('puterAccountStatus').textContent = payload.accountText || document.getElementById('puterAccountStatus').textContent;
-                } catch(e){}
-            });
-            this._puterStatusEventBound = true;
         }
     }
 
@@ -350,8 +309,6 @@ export class App {
         document.getElementById('checkpointBtn')?.addEventListener('click', () => this.createCheckpoint());
 
         document.getElementById('previewBtn').addEventListener('click', () => this.previewManager.showPreview());
-        // New: wire the top-level Deploy button in the Deployment panel to the real deploy routine
-        document.getElementById('deployBtn')?.addEventListener('click', () => this.deployToGitHubPages());
         // New: build & preview button triggers a (safe) in-browser build pipeline
         /* @tweakable [Label for the build button shown inside the Preview modal] */
         this.buildButtonLabel = 'Build & Compile';
@@ -783,7 +740,7 @@ export class App {
         if (role === 'user' && this.currentUser && this.currentUser.avatar_url) {
             avatarImg.src = this.currentUser.avatar_url;
         } else if (role === 'assistant') {
-            avatarImg.src = 'https://s3.us-west-2.amazonaws.com/s3.amazonaws.com/s.cdpn.io/332152/ai-avatar.png'; 
+            avatarImg.src = 'https://s3.us-west-2.amazonaws.com/s.cdpn.io/332152/ai-avatar.png'; 
         } else {
             avatarImg.src = 'https://www.gravatar.com/avatar/?d=retro'; 
         }
@@ -899,9 +856,8 @@ export class App {
         messagesContainer.appendChild(messageDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-        /* @tweakable [Enable typewriter effect for assistant messages even when media is present] */
-        const TYPING_WITH_MEDIA = false;
-        if (role === 'assistant' && !is_loading_message && (TYPING_WITH_MEDIA || (!imageUrl && !videoUrl))) {
+        // If assistant message and not loading, perform typing effect instead of instant append of text
+        if (role === 'assistant' && !is_loading_message) {
             // replace content area with typing animation and stream the content
             this.typeAssistantResponse(messageDiv, content, audioUrl);
         }
@@ -957,25 +913,6 @@ export class App {
     }
 
     async loadInternalScriptsContent() {
-        /* @tweakable [Font size (px) used in the Internal Scripts editor] */
-        const INTERNAL_SCRIPTS_FONT_SIZE = 13;
-        /* @tweakable [Max height (px) for the Internal Scripts editor area] */
-        const INTERNAL_SCRIPTS_MAX_HEIGHT = 720;
-        /* @tweakable [Wrap long lines in the Internal Scripts editor (true = wrap, false = no-wrap)] */
-        const INTERNAL_SCRIPTS_WRAP = true;
-        /* @tweakable [Enable search box in Internal Scripts panel to quickly filter scripts] */
-        const INTERNAL_SCRIPTS_ENABLE_SEARCH = true;
-        /* @tweakable [Search debounce ms for filtering internal scripts (helps performance)] */
-        const INTERNAL_SCRIPTS_SEARCH_DEBOUNCE = 180;
-        /* @tweakable [Max chars copied for AI summary/preview from an internal script] */
-        this._internalScriptCopyMaxChars = this._internalScriptCopyMaxChars || 5000;
-        /* @tweakable [Enable AI summarization button in Internal Scripts panel] */
-        this._internalScriptEnableAiSummary = typeof this._internalScriptEnableAiSummary === 'boolean' ? this._internalScriptEnableAiSummary : true;
-        /* @tweakable [Max chars sent to AI for summarization] */
-        this._internalScriptAiSummaryMaxChars = this._internalScriptAiSummaryMaxChars || 3000;
-        /* @tweakable [Delay (ms) used when refreshing internal scripts to debounce UI updates] */ 
-        const INTERNAL_SCRIPTS_REFRESH_DEBOUNCE = 80;
-
         try {
             const container = document.getElementById('devLogContent');
             if (!container) {
@@ -986,7 +923,6 @@ export class App {
             container.innerHTML = `
                 <div class="devlog-container" style="display:flex;flex-direction:column;gap:var(--spacing-md);">
                     <div style="display:flex;gap:var(--spacing-md);align-items:center;">
-                        ${INTERNAL_SCRIPTS_ENABLE_SEARCH ? `<input id="internalScriptSearch" placeholder="Filter scripts (search by name or tag)..." class="form-select" style="min-width:200px; max-width:420px;" />` : ''}
                         <label for="internalScriptSelect" style="font-weight:600;color:var(--color-text-dark);">Scripts</label>
                         <select id="internalScriptSelect" class="form-select" style="flex:1;"></select>
                         <button id="refreshInternalScriptsBtn" class="btn btn-secondary btn-sm" title="Refresh list">Refresh</button>
@@ -996,19 +932,16 @@ export class App {
                         <div style="display:flex;justify-content:space-between;align-items:center;">
                             <div id="internalScriptMeta" style="font-size:13px;color:var(--color-text-medium)"></div>
                             <div style="display:flex;gap:8px;">
-                                <button id="internalScriptRevealBtn" class="btn btn-secondary btn-sm" title="Reveal in Project Files">Reveal</button>
                                 <button id="internalScriptRefreshBtn" class="btn btn-secondary btn-sm">Refresh</button>
                                 <button id="internalScriptSaveBtn" class="btn btn-primary btn-sm">Save</button>
                             </div>
                         </div>
-                        <!-- Editor is a plain textarea for compatibility; styling tuned for dark theme and tweakables -->
-                        <textarea id="internalScriptEditor" class="devlog-code" style="width:100%;height:60vh;padding:var(--spacing-md);font-size:${INTERNAL_SCRIPTS_FONT_SIZE}px;max-height:${INTERNAL_SCRIPTS_MAX_HEIGHT}px;white-space:${INTERNAL_SCRIPTS_WRAP ? 'pre-wrap' : 'pre'};overflow:auto;"></textarea>
+                        <textarea id="internalScriptEditor" class="devlog-code" style="width:100%;height:60vh;padding:var(--spacing-md);"></textarea>
                     </div>
                 </div>
             `;
 
             const selectEl = document.getElementById('internalScriptSelect');
-            const searchEl = document.getElementById('internalScriptSearch');
             const infoEl = document.getElementById('devlogScriptInfo');
             const codePre = document.getElementById('devlogCodeBlock');
             const refreshBtn = document.getElementById('refreshInternalScriptsBtn');
@@ -1017,21 +950,10 @@ export class App {
             const editorMeta = document.getElementById('internalScriptMeta');
             const editorSaveBtn = document.getElementById('internalScriptSaveBtn');
             const editorRefreshBtn = document.getElementById('internalScriptRefreshBtn');
-            const editorRevealBtn = document.getElementById('internalScriptRevealBtn');
 
-            // Prefer live InternalScripts manifest when available (provides richer metadata for AI)
-            let scripts = [];
-            try {
-                const manifest = (window.InternalScripts && typeof window.InternalScripts.getManifest === 'function') ? window.InternalScripts.getManifest() : null;
-                if (Array.isArray(manifest) && manifest.length) {
-                    scripts = manifest.map(m => m.path || m.id).filter(Boolean);
-                }
-            } catch (e) { /* ignore manifest errors */ }
-            if (!scripts || scripts.length === 0) {
-                scripts = Array.isArray(this._internalScriptPaths) && this._internalScriptPaths.length
-                    ? this._internalScriptPaths
-                    : ['app.js','chatManager.js','githubManager.js','previewManager.js','fileManager.js','buildManager.js','commentsManager.js','styles.css','index.html','utils.js','buildWorker.js','projectManager.js'];
-            }
+            const scripts = Array.isArray(this._internalScriptPaths) && this._internalScriptPaths.length
+                ? this._internalScriptPaths
+                : ['app.js','chatManager.js','githubManager.js','previewManager.js','fileManager.js','buildManager.js','commentsManager.js','styles.css','index.html','utils.js','buildWorker.js','projectManager.js'];
 
             selectEl.innerHTML = '';
             scripts.forEach(path => {
@@ -1041,31 +963,12 @@ export class App {
                 selectEl.appendChild(opt);
             });
 
-            // Search/filter helper (debounced)
-            if (searchEl) {
-                let t = null;
-                const doFilter = () => {
-                    const q = (searchEl.value || '').toLowerCase().trim();
-                    selectEl.innerHTML = '';
-                    (scripts.filter(s => !q || s.toLowerCase().includes(q) || (window.InternalScripts.get(s)?.tags || []).join(' ').toLowerCase().includes(q))).forEach(path => {
-                        const opt = document.createElement('option');
-                        opt.value = path;
-                        opt.textContent = path;
-                        selectEl.appendChild(opt);
-                    });
-                    if (selectEl.options.length > 0) fetchAndPopulateEditor(selectEl.value);
-                };
-                searchEl.addEventListener('input', () => { clearTimeout(t); t = setTimeout(doFilter, INTERNAL_SCRIPTS_SEARCH_DEBOUNCE); });
-            }
-
             // Fetch file text and populate editor (on demand)
             const fetchAndPopulateEditor = async (path) => {
                 if (!path) return;
                 infoEl.textContent = `Loading ${path}...`;
                 editor.value = '';
                 editorMeta.textContent = `Loading ${path}...`;
-                /* @tweakable [persist last selected Internal Script key in localStorage] */
-                localStorage.setItem('internalScript:last', path);
                 try {
                     const resp = await fetch(path, { cache: 'no-store' });
                     if (!resp.ok) {
@@ -1075,11 +978,7 @@ export class App {
                         return;
                     }
                     const text = await resp.text();
-                    // Preserve CRLF normalization and apply dark-friendly background via CSS class
                     editor.value = text;
-                    editor.classList.add('devlog-code--loaded');
-                    editor.style.background = 'var(--color-bg-dark)';
-                    editor.style.color = 'var(--color-text-dark)';
                     editorMeta.textContent = `${path} — ${text.split('\n').length} lines`;
                     infoEl.textContent = `Editing ${path}`;
                 } catch (err) {
@@ -1128,17 +1027,6 @@ export class App {
                 fetchAndPopulateEditor(selectEl.value);
             });
 
-            editorRevealBtn.addEventListener('click', () => {
-                const path = selectEl.value;
-                if (!path) return;
-                // focus the main file tree and select the item
-                this.switchMainPanel('code');
-                this.switchFile(path);
-                const tree = document.getElementById('fileTreeContainer');
-                const el = tree && tree.querySelector(`.tree-file-item[data-file="${CSS.escape(path)}"]`);
-                if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('active'); }
-            });
-
             refreshBtn.addEventListener('click', () => {
                 selectEl.innerHTML = '';
                 (this._internalScriptPaths || scripts).forEach(path => {
@@ -1151,80 +1039,8 @@ export class App {
                 this.addConsoleMessage('info', 'Internal Scripts list refreshed.');
             });
 
-            // NEW: Quick AI & clipboard helpers for internal scripts (copy trimmed preview, summarize via websim if available)
-            const aiSummarizeBtn = document.createElement('button');
-            aiSummarizeBtn.id = 'internalScriptSummarizeBtn';
-            aiSummarizeBtn.className = 'btn btn-secondary btn-sm';
-            aiSummarizeBtn.textContent = 'Summarize (AI)';
-            aiSummarizeBtn.title = 'Send a trimmed preview to the AI for a short summary';
-            const copyForAiBtn = document.createElement('button');
-            copyForAiBtn.id = 'internalScriptCopyForAIBtn';
-            copyForAiBtn.className = 'btn btn-secondary btn-sm';
-            copyForAiBtn.textContent = 'Copy for AI';
-            copyForAiBtn.title = 'Copy a trimmed preview (uses app tweakable) to clipboard for quick AI prompts';
-            // attach to header region near refresh button
-            refreshBtn.parentNode?.insertBefore(copyForAiBtn, refreshBtn.nextSibling);
-            refreshBtn.parentNode?.insertBefore(aiSummarizeBtn, copyForAiBtn.nextSibling);
-
-            aiSummarizeBtn.addEventListener('click', async () => {
-                if (!this._internalScriptEnableAiSummary) { this.addConsoleMessage('warn', 'AI summarization disabled via tweakable.'); return; }
-                const path = selectEl.value;
-                if (!path) return this.addConsoleMessage('warn', 'No script selected.');
-                const raw = editor.value || '';
-                const trimmed = raw.slice(0, Number(this._internalScriptAiSummaryMaxChars || 3000));
-                this.addConsoleMessage('info', `Requesting AI summary for ${path} (chars=${trimmed.length})...`);
-                if (window.websim && websim.chat && websim.chat.completions && typeof websim.chat.completions.create === 'function') {
-                    try {
-                        const prompt = `Provide a concise 3-6 sentence summary and a short list of potential issues or TODOs for the following code file (${path}).\n\n${trimmed}`;
-                        const completion = await websim.chat.completions.create({ messages: [{ role: 'user', content: prompt }], json: false });
-                        const text = completion?.content || completion || 'No response';
-                        // show a small modal-like output area (non-blocking)
-                        const sumModalId = 'internalScriptAiSummaryModal';
-                        document.getElementById(sumModalId)?.remove();
-                        const modal = document.createElement('div');
-                        modal.id = sumModalId;
-                        modal.style.position = 'fixed';
-                        modal.style.left = '50%'; modal.style.top = '50%';
-                        modal.style.transform = 'translate(-50%,-50%)';
-                        modal.style.zIndex = 100000;
-                        modal.style.background = 'var(--color-bg-light)';
-                        modal.style.color = 'var(--color-text-dark)';
-                        modal.style.padding = '12px';
-                        modal.style.border = '1px solid var(--color-border)';
-                        modal.style.maxWidth = '80vw';
-                        modal.style.maxHeight = '70vh';
-                        modal.style.overflow = 'auto';
-                        modal.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><strong>AI Summary — ${path}</strong><button id="${sumModalId}-close" class="btn btn-secondary btn-sm">Close</button></div><pre style="white-space:pre-wrap;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace;">${DOMPurify ? DOMPurify.sanitize(text) : text}</pre>`;
-                        document.body.appendChild(modal);
-                        document.getElementById(`${sumModalId}-close`).addEventListener('click', () => modal.remove());
-                    } catch (err) {
-                        this.addConsoleMessage('error', `AI summary failed: ${err.message || err}`);
-                    }
-                } else {
-                    this.addConsoleMessage('warn', 'Websim AI not available. Copy the script using "Copy for AI" and paste into your preferred AI tool.');
-                }
-            });
-
-            copyForAiBtn.addEventListener('click', async () => {
-                const path = selectEl.value;
-                if (!path) return this.addConsoleMessage('warn', 'No script selected.');
-                const raw = editor.value || '';
-                const max = Number(this._internalScriptCopyMaxChars || 5000);
-                const preview = this._internalScriptPretty ? this._internalScriptPretty(raw, max) : (window._puterDiagPretty ? window._puterDiagPretty(raw, max) : raw.slice(0, max));
-                try {
-                    await navigator.clipboard.writeText(preview);
-                    this.showTemporaryFeedback('Script preview copied to clipboard for AI.');
-                    this.addConsoleMessage('info', `Copied ${Math.min(preview.length, raw.length)} chars of ${path} to clipboard.`);
-                } catch (e) {
-                    this.addConsoleMessage('error', 'Copy to clipboard failed: ' + (e.message || e));
-                }
-            });
-
             if (selectEl.options.length > 0) {
-                const saved = localStorage.getItem('internalScript:last');
-                const initial = (saved && Array.from(selectEl.options).some(o=>o.value===saved)) ? saved : selectEl.value;
-                selectEl.value = initial;
-                fetchAndPopulateEditor(initial);
+                fetchAndPopulateEditor(selectEl.value);
             }
 
             this.addConsoleMessage('info', `Internal Scripts: UI ready with ${selectEl.options.length} entries.`);
@@ -1246,8 +1062,7 @@ export class App {
     }
 
     switchFile(filename) {
-        const allowEmpty = this._switchAllowEmpty ?? true; /* @tweakable When true, allow switching to files even if their content is empty */
-        if (Object.prototype.hasOwnProperty.call(this.currentFiles, filename) && (allowEmpty || this.currentFiles[filename])) {
+        if (this.currentFiles[filename]) {
             this.currentFile = filename;
             this.updateCodeEditor();
             this.renderFileTree();
@@ -2856,17 +2671,14 @@ export class App {
         }
     }
 
-    async generateImageFromMessage(prompt, opts = {}) {
-        /* @tweakable [Inline media in the existing assistant bubble when available] */ this._inlineImageInCurrentMessage = this._inlineImageInCurrentMessage ?? true;
-        /* @tweakable [default image aspect: 'square' | 'portrait' | 'landscape'] */ this._imgAspect = this._imgAspect || 'square';
-        /* @tweakable [show overlay automatically after generation] */ this._imgAutoOpenOverlay = this._imgAutoOpenOverlay ?? true;
-        /* @tweakable [Maximum width of inline chat images in px] */ this._chatImgMaxWidth = this._chatImgMaxWidth || 560;
-        /* @tweakable [Border radius of inline chat images in px] */ this._chatImgRadius = this._chatImgRadius || 4;
+    async generateImageFromMessage(prompt) {
         this.addConsoleMessage('info', `Attempting to generate image with prompt: "${prompt.substring(0, 50)}..."`);
         this.showTemporaryFeedback('Generating image...', 'info');
 
         try {
             this.generatedImageUrl = null;
+            this.showImagePreviewOverlay();
+
             const result = await websim.imageGen({ prompt: prompt });
 
             if (result && result.url) {
@@ -2876,17 +2688,8 @@ export class App {
                 this.saveCurrentProject();
                 this.renderFileTree();
 
-                // If caller provided a target message bubble (e.g., current loading response), append inline there
-                const targetMsg = opts.attachToMessageDiv && this._inlineImageInCurrentMessage ? opts.attachToMessageDiv : null;
-                if (targetMsg && targetMsg.querySelector('.message-content')) {
-                    this._appendImageToMessage(targetMsg, result.url);
-                } else {
-                    const msgEl = this.addMessage('assistant', `Here's an image based on your request!`, null, false, result.url);
-                    const imgEl = msgEl?.querySelector('.message-image');
-                    if (imgEl) { imgEl.style.maxWidth = this._chatImgMaxWidth + 'px'; imgEl.style.borderRadius = this._chatImgRadius + 'px'; }
-                }
+                this.addMessage('assistant', `Here's an image based on your request!`, null, false, result.url);
                 this.showTemporaryFeedback('Image generated successfully!', 'success');
-                if (this._imgAutoOpenOverlay) this.showImagePreviewOverlay(result.url);
             } else {
                 throw new Error("No image URL returned from generation.");
             }
@@ -2924,53 +2727,6 @@ export class App {
             this.showTemporaryFeedback(`Failed to process video request: ${error.message}`, 'error');
             console.error("Video generation fallback error:", error);
         }
-    }
-
-    /* @tweakable [Caption shown when appending an image into an existing assistant message] */
-    _inlineImageCaption = ' ';
-    
-    _appendImageToMessage(messageDiv, imageUrl) {
-        try {
-            const contentDiv = messageDiv.querySelector('.message-content');
-            if (!contentDiv) return;
-            // Ensure there is at least some caption/text so the bubble isn't blank
-            if (!contentDiv.innerHTML.trim()) {
-                contentDiv.textContent = this._inlineImageCaption || ' ';
-            }
-            const imgElement = document.createElement('img');
-            imgElement.src = imageUrl;
-            imgElement.alt = 'Generated Image';
-            imgElement.className = 'message-image';
-            imgElement.style.maxWidth = (this._chatImgMaxWidth || 560) + 'px';
-            imgElement.style.borderRadius = (this._chatImgRadius || 4) + 'px';
-            contentDiv.appendChild(imgElement);
-            const viewSaveBtn = document.createElement('button');
-            viewSaveBtn.className = 'btn btn-secondary btn-sm view-image-button';
-            viewSaveBtn.textContent = 'View Full / Save Image';
-            viewSaveBtn.dataset.imageUrl = imageUrl;
-            contentDiv.appendChild(viewSaveBtn);
-        } catch (e) {
-            this.addConsoleMessage('warn', 'Failed to inline image: ' + (e.message || e));
-        }
-    }
-
-    showImagePreviewOverlay(url = this.generatedImageUrl) {
-        const wrap = document.getElementById('imagePreviewOverlay');
-        const img = document.getElementById('imagePreview');
-        const saveBtn = document.getElementById('saveImageBtn');
-        const loading = document.getElementById('imagePreviewLoading');
-        if (!wrap) return;
-        wrap.style.display = 'flex'; loading.style.display = 'none';
-        if (url && img) { img.src = url; img.style.display = 'block'; if (saveBtn) saveBtn.style.display = 'inline-flex'; }
-    }
-
-    hideImagePreviewOverlay() {
-        const wrap = document.getElementById('imagePreviewOverlay');
-        const img = document.getElementById('imagePreview');
-        const saveBtn = document.getElementById('saveImageBtn');
-        if (!wrap) return;
-        wrap.style.display = 'none'; if (img) { img.src = ''; img.style.display = 'none'; }
-        if (saveBtn) saveBtn.style.display = 'none';
     }
 
     applySketchVars() {
@@ -3204,16 +2960,7 @@ Check your console and the live preview to see if the bundled code functions as 
     }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        // Initialize in-browser esbuild early (non-blocking)
-        if (window.buildManager && typeof window.buildManager.initEsbuild === 'function') {
-            buildManager.initEsbuild().catch(err => { console.warn('esbuild init failed (non-fatal):', err); });
-        } else {
-            // dynamic import fallback if buildManager wasn't attached to window
-            import('./buildManager.js').then(m => m.initEsbuild?.().catch(e => console.warn('esbuild init failed:', e))).catch(()=>{});
-        }
-    } catch(e) { console.warn('esbuild init attempt failed', e); }
+document.addEventListener('DOMContentLoaded', () => {
     // expose app instance for integration modules (dictation, Puter helpers)
     window.devSparkApp = new App();
 });

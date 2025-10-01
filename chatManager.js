@@ -2,25 +2,6 @@ import { App } from "./app.js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 
-/* @tweakable [Timeout ms for provider fallback attempts] */
-const FALLBACK_TIMEOUT_MS_DEFAULT = 9000;
-
-/* @tweakable [Product/App name to attribute in responses] */
-const PRODUCT_NAME = 'VisionStack';
-/* @tweakable [Official creator/organization name for attribution] */
-const CREATOR_NAME = 'JBLinx Studio';
-/* @tweakable [Lead developer name for attribution] */
-const LEAD_DEVELOPER = 'Brendon Lightfoot';
-/* @tweakable [Playful taglines for attribution replies; will rotate] */
-const ATTRIBUTION_VARIANTS = [
-  `${CREATOR_NAME} — powered by the craft of ${LEAD_DEVELOPER} (lead dev)`,
-  `VisionStack is a JBLinx Studio creation; captain on deck: ${LEAD_DEVELOPER}.`,
-  `Built with love at ${CREATOR_NAME}. Lead wizard: ${LEAD_DEVELOPER}.`,
-  `Brought to life by ${CREATOR_NAME}. ${LEAD_DEVELOPER} helmed the code.`
-];
-/* @tweakable [Include emoji flair in attribution replies] */ const ATTRIBUTION_EMOJI = '✨';
-/* @tweakable [Enable emoji flair] */ const ATTRIBUTION_USE_EMOJI = true;
-
 export class ChatManager {
     constructor(app) {
         this.app = app;
@@ -49,23 +30,6 @@ export class ChatManager {
             userPreferences: {},
             codePatterns: new Set()
         };
-
-        /* @tweakable [fallback timeout ms] */
-        this.FALLBACK_TIMEOUT_MS = FALLBACK_TIMEOUT_MS_DEFAULT;
-        /* @tweakable [Internal rotation index for attribution variants] */
-        this.attributionIndex = 0;
-        /* @tweakable [keywords that indicate an image request] */ this._imageRequestKeywords = ['image', 'picture', 'photo', 'draw', 'generate an image', 'art', 'illustration'];
-        /* @tweakable [minimum keyword hits to trigger image generation without waiting for AI] */ this._imageRequestThreshold = 1;
-        /* @tweakable [Default descriptive style used when generating images (adds realism, lighting, camera terms)] */
-        this._imageGenDefaultStyle = "photorealistic, ultra-detailed, cinematic lighting, soft golden-hour sunlight, high dynamic range, 50mm camera, shallow depth of field";
-        /* @tweakable [Default aspect ratio for generated images: "1:1", "16:9", "9:16"] */
-        this._imageGenDefaultAspect = "16:9";
-        /* @tweakable [When true, attach generated images inline to the assistant's chat bubble] */
-        this._inlineImageInCurrentMessage = true;
-        /* @tweakable [Max width for inline chat images in px] */
-        this._chatImgMaxWidth = 720;
-        /* @tweakable [Max height for inline chat images in px] */
-        this._chatImgMaxHeight = 420;
     }
 
     // New helper: analyze a file and post an assistant message summarizing it
@@ -211,21 +175,6 @@ export class ChatManager {
         this.currentLoadingPhaseIndex = 0;
     }
 
-    shouldAnswerAttribution(text) {
-        const t = (text || '').toLowerCase();
-        const whoWords = /(who|which|what|whom)\b/;
-        const actionWords = /(made|built|created|coded|developed|invented|authored|wrote|founded|maker|creator|author|developer)\b/;
-        const appWords = /(visionstack|this app|this application|this tool|this editor|this ide)\b/;
-        return whoWords.test(t) && actionWords.test(t) && appWords.test(t);
-    }
-
-    /* @tweakable [Generate a playful, non-formulaic attribution reply] */
-    getAttributionReply() {
-        const v = ATTRIBUTION_VARIANTS[this.attributionIndex % ATTRIBUTION_VARIANTS.length];
-        this.attributionIndex++;
-        return ATTRIBUTION_USE_EMOJI ? `${ATTRIBUTION_EMOJI} ${v}` : v;
-    }
-
     analyzeProjectContext() {
         const context = {
             projectComplexity: this.calculateProjectComplexity(),
@@ -366,31 +315,6 @@ export class ChatManager {
 
         this.conversationContext.lastUserIntent = this.extractIntent(userMessage);
 
-        // Fast-path: if the user clearly requested an image, generate immediately
-        if (this._isImageRequest(userMessage)) {
-            // Attach generation to the existing assistant loading bubble to avoid creating a duplicate/empty message.
-            // Do not remove the loading bubble here — let app.generateImageFromMessage append the image into it.
-            await this.app.generateImageFromMessage(userMessage, { attachToMessageDiv: this.currentLoadingMessageDiv });
-            // clear reference after generation finishes
-            this.currentLoadingMessageDiv = null;
-            return;
-        }
-
-        // Attribution shortcut: always answer origin/creator questions consistently
-        if (this.shouldAnswerAttribution(userMessage)) {
-            const reply = this.getAttributionReply();
-            this.stopLoadingAnimation();
-            if (this.currentLoadingMessageDiv) {
-                const contentDiv = this.currentLoadingMessageDiv.querySelector('.message-content');
-                contentDiv.textContent = reply;
-                this.currentLoadingMessageDiv.classList.remove('loading-message');
-            } else {
-                this.app.addMessage('assistant', reply);
-            }
-            this.app.conversationHistory.push({ role: 'assistant', content: reply });
-            return;
-        }
-
         // Pre-handle project management commands client-side for quicker response
         if (this.conversationContext.lastUserIntent === 'create_project') {
             await this.handleCreateProjectCommand(userMessage);
@@ -426,13 +350,13 @@ export class ChatManager {
 
             const systemPrompt = `You are an advanced AI assistant for VisionStack, a professional web development IDE and code editor application. You are highly intelligent, contextually aware, and capable of deep analysis and creative problem-solving. Your communication style is ${preferredTone}.\n\nWhen providing explanations or code snippets in your 'message' field, use GitHub-flavored Markdown (GFM) for formatting (e.g., \`\`\`html for code blocks, **bold**, *italics*, lists, etc.). This helps present information clearly within the chat interface.\n\nCURRENT USER CONTEXT:\n- Username: ${this.app.currentUser?.username || 'Guest'}\n- User ID: ${this.app.currentUser?.id || 'N/A'}\n- Avatar URL: ${this.app.currentUser?.avatar_url || 'N/A'}\n\nCORE INTELLIGENCE CAPABILITIES:\n- Deep understanding of web development patterns and best practices\n- Contextual awareness of user skill level and project complexity\n- Ability to analyze code quality and suggest improvements\n- Pattern recognition for common development issues\n- Adaptive communication based on user expertise\n- Proactive error prevention and optimization suggestions\n\nCURRENT PROJECT ANALYSIS:\n- Project: \"${this.app.currentProject?.name || 'No project loaded'}\"\n- Complexity: ${projectContext.projectComplexity}\n- Code Quality: ${projectContext.codeQuality}\n- User Skill Level: ${projectContext.userSkillLevel}\n- Last Intent: ${this.conversationContext.lastUserIntent}\n- Active File: ${this.app.currentFile || 'None'}\n- Files: [${Object.keys(this.app.currentFiles || {}).join(', ') || 'No files'}]\n\nINTERFACE STATE AWARENESS:\nDevSpark AI has a three-panel layout:\n1. LEFT SIDEBAR (280px): Project management, file tree (HTML/CSS/JS/Images categorized), GitHub integration\n2. CENTER CHAT: Our conversation area with speech controls and context menus\n3. RIGHT EDITOR: Tabbed interface (Code Editor/Console/Deployment) with live preview\n\nCurrent State:\n- Panel View: ${this.app.currentMainPanel} (code/console)\n- GitHub: ${this.app.githubManager?.githubToken ? `Connected (${this.app.githubManager.currentRepoInfo?.owner}/${this.app.githubManager.currentRepoInfo?.name})` : 'Disconnected'}\n- Speech: ${this.app.speechEnabled ? `Enabled (${this.app.voicePreference})` : 'Disabled'}\n- Projects: ${this.app.projects?.length || 0} total\n\nNEW: CLARIFICATION ON FILE EXECUTION IN PREVIEW\nIMPORTANT: The live preview in DevSpark AI directly renders HTML/CSS/JS in the browser.\nFiles like .ts, .tsx, .jsx require a *build step* (e.g., transpilation with Babel or TypeScript compiler, bundling with Vite/Webpack)\nto be converted into executable JavaScript for the browser.\nCurrently, DevSpark AI's live preview does *not* include an in-browser build step for these files.\nTherefore, while these files can be *edited*, their changes will NOT reflect in the live preview\nuntil they are explicitly compiled into standard JavaScript and linked in your HTML.\nPlease inform the user of this limitation if they inquire about their non-JS files not running.\n\nADVANCED RESPONSE STRATEGIES:\n1. CONTEXTUAL ADAPTATION: Adjust explanations based on user skill level\n   - Beginner: Detailed explanations with learning opportunities\n   - Intermediate: Balanced technical depth with practical examples\n   - Advanced: Concise, technical responses with optimization focus\n\n2. PROACTIVE ASSISTANCE: Anticipate needs and suggest improvements\n   - Identify potential issues before they occur\n   - Suggest modern alternatives to outdated practices\n   - Recommend performance optimizations\n   - Propose accessibility improvements\n\n3. INTELLIGENT CODE GENERATION:\n   - Follow established patterns in the current project\n   - Ensure consistency with existing code style\n   - Add helpful comments for learning\n   - Include error handling and edge cases\n   - Use modern ES6+ JavaScript features appropriately\n\n4. QUALITY ASSURANCE:\n   - Validate HTML semantics and accessibility\n   - Ensure responsive design principles\n   - Follow CSS best practices (BEM, custom properties)\n   - Implement proper JavaScript patterns\n   - Add appropriate meta tags and SEO considerations\n\nENHANCED CAPABILITIES:\n- Generate complete, production-ready applications\n- Debug complex issues with detailed analysis\n- Optimize performance with specific recommendations\n- Create responsive, accessible, modern designs\n- Generate relevant images and assets\n- Provide learning-oriented explanations\n- Suggest project structure improvements\n- Help with GitHub workflow optimization\n\nIMAGE GENERATION CAPABILITY:\nIf the user explicitly asks you to generate an image or create a picture (e.g., "generate an image of a cat", "draw a sunset", "show me a picture of a futuristic city"), you must respond with a JSON object that includes an "action" field. This action field tells DevSpark AI to initiate an image generation process.\n\nExample JSON response for image generation:\n{\n    "message": "Alright! I've generated an image based on your request. Take a look!",\n    "files": {}, // Important: Do NOT include any file changes when generating an image\n    "action": {\n        "type": "generate_image",\n        "prompt": "<THE_DESCRIPTIVE_IMAGE_PROMPT_HERE>" // This prompt will be used for image generation\n    }\n}\nEnsure the 'prompt' in the 'action' field is descriptive and captures the essence of the user's image request. After this response, the DevSpark AI application will handle the image generation and display it to the user.\n\nVIDEO GENERATION CAPABILITY:\nIf the user explicitly asks you to generate a video or create a clip (e.g., "generate a video of a busy street", "make a clip of a dog running", "show me a video of a sci-fi landscape"), you must respond with a JSON object that includes an "action" field. This action field tells DevSpark AI to initiate a video generation process.\n\nExample JSON response for video generation:\n{\n    "message": "Excellent! I'm creating a video based on your request. Please bear with me for a moment...",\n    "files": {}, // Important: Do NOT include any file changes when generating a video\n    "action": {\n        "type": "generate_video",\n        "prompt": "<THE_DESCRIPTIVE_VIDEO_PROMPT_HERE>" // This prompt will be used for video generation\n    }\n}\nEnsure the 'prompt' in the 'action' field is descriptive and captures the essence of the user's image/video request. After this response, the DevSpark AI application will handle the media generation and display it to the user.\n\nRESPONSE FORMAT (CRITICAL):\nAlways respond with valid JSON containing "message" and "files" keys, and optionally an "action" key for image/video generation.\n{\n    "message": "Your intelligent, contextual response here (use GFM markdown for formatting code snippets, **bold**, *italics*, etc.)",\n    "files": {\n        "filename.ext": "content or URL" // Omit or provide empty object if an action is present\n    },\n    "action"?: { // Optional field for specific actions\n        "type": "generate_image" | "generate_video",\n        "prompt": "..." // This prompt will be used for image/video generation\n    }\n}\n\nINTELLIGENT CONVERSATION GUIDELINES:\n- Be proactive: Suggest improvements even when not explicitly asked\n- Be educational: Explain the "why" behind your decisions\n- Be efficient: Provide complete solutions that work immediately\n-- Be modern: Use current best practices and technologies\n- Be aware: Reference the current project state and user patterns\n- Be helpful: Anticipate follow-up questions and provide comprehensive answers\n- **Response Tone:** Be professional and concise, but also friendly and approachable. Use a casual tone where appropriate, avoiding overly formal language.\n\nRemember: You're not just generating code, you're being an intelligent development partner who understands the project, the user, and the goals. Think deeply, provide value, and enhance the development experience.`;
 
-            /* @tweakable [Extra system guidelines for playful VisionStack attribution] */
-            const ATTRIBUTION_SYSTEM_GUIDE = `When asked who invented or coded VisionStack, always credit JBLinx Studio and Brendon Lightfoot (lead developer). Keep it playful, vary phrasing, avoid rigid canned lines.`;
-
+            // Route AI call based on selected provider (app.aiProvider)
             const aiRequestPayload = {
                 messages: [
+                    { role: 'system', content: systemPrompt },
                     ...conversationForAI
-                ]
+                ],
+                json: true
             };
             const completion = await this.requestAIResponse(aiRequestPayload);
 
@@ -514,20 +438,8 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
             // The `currentLoadingMessageDiv` would have been prepared by `startLoadingAnimation`
             if (this.currentLoadingMessageDiv) {
                 const contentDiv = this.currentLoadingMessageDiv.querySelector('.message-content');
-                // If the AI response includes a media-generation action, avoid rendering the full
-                // textual assistant message here to prevent duplicate bubbles. Instead render a
-                // short caption and let the media handler inline the image/video into the same bubble.
-                /* @tweakable [When true, avoid duplicating assistant text for media-generation actions] */
-                const SUPPRESS_TEXT_FOR_MEDIA_ACTIONS = true;
-                if (SUPPRESS_TEXT_FOR_MEDIA_ACTIONS && parsedResponse.action && (parsedResponse.action.type === 'generate_image' || parsedResponse.action.type === 'generate_video')) {
-                    // render a small caption so the bubble isn't empty; media handler will append the asset.
-                    contentDiv.innerHTML = DOMPurify.sanitize(marked.parse(parsedResponse.message || "Here's something I generated for you."));
-                    // mark that this bubble will receive media so callers can attach to it
-                    contentDiv.dataset.expectingMedia = 'true';
-                } else {
-                    // Use DOMPurify and marked for AI messages
-                    contentDiv.innerHTML = DOMPurify.sanitize(marked.parse(parsedResponse.message));
-                }
+                // Use DOMPurify and marked for AI messages
+                contentDiv.innerHTML = DOMPurify.sanitize(marked.parse(parsedResponse.message));
                 contentDiv.dataset.rawContent = parsedResponse.message; // Ensure raw content is stored for context menu
 
                 // Add copy button to code blocks
@@ -585,8 +497,8 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
                 switch (parsedResponse.action.type) {
                     case 'generate_image':
                         try {
-                            // Append image directly into the current assistant bubble if present to avoid duplicate messages
-                            await this.app.generateImageFromMessage(parsedResponse.action.prompt, { attachToMessageDiv: this.currentLoadingMessageDiv });
+                            // `generateImageFromMessage` will handle adding the image to the chat and opening the modal.
+                            await this.app.generateImageFromMessage(parsedResponse.action.prompt);
                         } catch (imageGenError) {
                             // Error handling for image generation is directly handled by app.js::generateImageFromMessage
                             // which also adds a chat message for failure.
@@ -662,156 +574,83 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
         }
     }
 
-    // Request AI with auto-fallback rotation between Lovable AI, WebSim, and Puter
+    // NEW: choose provider at runtime and call appropriate API (websim or PuterService)
     async requestAIResponse(payload) {
-        const FALLBACK_TIMEOUT_MS = this.FALLBACK_TIMEOUT_MS || FALLBACK_TIMEOUT_MS_DEFAULT;
-        const runningInWebsim = typeof window.websim !== 'undefined';
-        
-        // Get selected model from AI selector
-        let selectedModel = 'lovable:gemini-flash';
-        try { 
-            selectedModel = (window.getPreferredModel && await window.getPreferredModel()) || 
-                           window.__lastSelectedModel?.id || 
-                           this.app.aiProvider || 
-                           selectedModel; 
-        } catch {}
-
-        // Map model IDs to providers and API models
-        const modelMap = {
-            'lovable:gemini-flash': { provider: 'gemini', model: 'google/gemini-2.5-flash' },
-            'lovable:gemini-pro': { provider: 'gemini', model: 'google/gemini-2.5-pro' },
-            'lovable:gemini-lite': { provider: 'gemini', model: 'google/gemini-2.5-flash-lite' },
-            'websim:gpt5-nano': { provider: 'websim', model: null },
-            'puter:gpt-5': { provider: 'puter', model: 'gpt-5' },
-            'puter:claude-sonnet': { provider: 'puter', model: 'claude-sonnet-4-20250514' },
-            'puter:deepseek-r1': { provider: 'puter', model: 'deepseek-r1' },
-            'puter:llama-3.3': { provider: 'puter', model: 'llama-3.3-70b' }
-        };
-
-        const modelInfo = modelMap[selectedModel] || { provider: 'gemini', model: 'google/gemini-2.5-flash' };
-        
-        console.log(`🤖 Selected model: ${selectedModel}, Provider: ${modelInfo.provider}, API Model: ${modelInfo.model}`);
-
-        // Define provider call functions
-        const callGemini = async () => {
-            const FUNCTIONS_URL = 'https://dtwyytscuoyrbhajkbyk.functions.supabase.co/lovable-ai-chat';
-            console.log('🟢 Calling Google Gemini via Lovable Gateway with model:', modelInfo.model);
-            
-            const response = await fetch(FUNCTIONS_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    messages: payload.messages,
-                    model: modelInfo.model
-                })
-            });
-
-            console.log('🟢 Gemini response status:', response.status);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ Gemini error response:', errorText);
-                throw new Error(`Google Gemini error: ${response.status} - ${errorText}`);
-            }
-
-            const data = await response.json();
-            console.log('✅ Gemini response received');
-            return data.choices?.[0]?.message?.content || data.content || '';
-        };
-
-        const callWebsim = async () => {
-            console.log('🔴 Checking WebSim availability...');
-            if (!runningInWebsim) {
-                throw new Error('WebSim AI only works when running inside WebSim.com environment. Please select a different AI model.');
-            }
-            if (window.websim?.chat?.completions?.create) {
-                console.log('🔴 Calling WebSim AI...');
-                const result = await websim.chat.completions.create(payload);
-                console.log('✅ WebSim response received');
-                return result;
-            }
-            throw new Error('WebSim SDK not available in this environment');
-        };
-
-        const callPuter = async () => {
-            console.log('🟣 Calling Puter AI with model:', modelInfo.model);
-            
-            // Check if user is signed in
-            const signedIn = !!(window.Puter?.auth?.currentUser || window.PuterShim?.user);
-            if (!signedIn) {
-                throw new Error('Puter AI requires sign-in. Please sign in to your Puter account to use Puter AI models.');
-            }
-            
-            // Build Puter-compatible payload
-            const puterPayload = {
-                model: modelInfo.model,
-                messages: payload.messages,
-                stream: false
-            };
-
-            console.log('🟣 Puter payload:', JSON.stringify(puterPayload, null, 2));
-
-            // Try various Puter AI interfaces in priority order
-            let result;
-            let usedInterface = null;
-            
-            if (window.Puter?.ai?.chat) {
-                console.log('🟣 Using window.Puter.ai.chat()');
-                usedInterface = 'Puter.ai.chat';
-                result = await window.Puter.ai.chat(puterPayload);
-            } else if (window.PuterAPI?.ai?.chat) {
-                console.log('🟣 Using window.PuterAPI.ai.chat()');
-                usedInterface = 'PuterAPI.ai.chat';
-                result = await window.PuterAPI.ai.chat(puterPayload);
-            } else if (window.PuterService?.ai?.chat) {
-                console.log('🟣 Using window.PuterService.ai.chat()');
-                usedInterface = 'PuterService.ai.chat';
-                result = await window.PuterService.ai.chat(puterPayload);
-            } else {
-                console.error('❌ No Puter AI interface available');
-                throw new Error('Puter AI SDK not available. Please ensure Puter SDK is loaded and you are signed in.');
-            }
-
-            console.log(`✅ Puter AI response received via ${usedInterface}:`, result);
-            
-            // Extract content from Puter response format
-            if (typeof result === 'string') return result;
-            if (result?.choices?.[0]?.message?.content) return result.choices[0].message.content;
-            if (result?.content) return result.content;
-            if (result?.message) return result.message;
-            if (result?.text) return result.text;
-            
-            console.error('❌ Unexpected Puter response format:', result);
-            throw new Error('Unexpected Puter AI response format. Please try again or select a different model.');
-        };
-
-        // Provider routing - NO AUTO-FALLBACK (user selected specific model)
-        const providers = [
-            { name: 'gemini', fn: callGemini },
-            { name: 'websim', fn: callWebsim },
-            { name: 'puter', fn: callPuter }
-        ];
-
-        // Call ONLY the selected provider (no auto-fallback)
-        const selectedProvider = providers.find(p => p.name === modelInfo.provider);
-        
-        if (!selectedProvider) {
-            throw new Error(`Unknown AI provider: ${modelInfo.provider}`);
-        }
-
         try {
-            console.log(`🤖 Using AI provider: ${selectedProvider.name}`);
-            const result = await Promise.race([
-                selectedProvider.fn(),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error(`${selectedProvider.name} request timed out after ${FALLBACK_TIMEOUT_MS}ms`)), FALLBACK_TIMEOUT_MS)
-                )
-            ]);
-            console.log(`✅ ${selectedProvider.name} responded successfully`);
-            return result;
-        } catch (error) {
-            console.error(`❌ ${selectedProvider.name} failed:`, error);
-            throw new Error(`${selectedProvider.name} error: ${error.message}`);
+            // Prefer the user's selected model (Puter KV / localStorage) when available
+            // Use unified AI provider system - check both AI selector and app.aiProvider
+            const pref = (window.getPreferredModel) ? await window.getPreferredModel() : null;
+            const providerId = pref || (this.app.aiProvider || 'websim:gpt5-nano');
+            const [backend, model] = (providerId || 'websim:gpt5-nano').split(':');
+
+            // Websim routing: use websim.chat.completions.create if available
+            if (backend === 'websim' && window.websim && websim.chat && websim.chat.completions) {
+                const req = { ...payload };
+                if (model) req.model = model;
+                return await websim.chat.completions.create(req);
+            }
+
+            // Puter routing: support multiple surfaces (PuterService, Puter, PuterAPI)
+            if (backend === 'puter') {
+                // Build model variants for robust compatibility across Puter surfaces
+                const getVariants = (m) => {
+                    if (m === 'openai') return ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
+                    if (m === 'claude-35-sonnet') return ['claude-3-5-sonnet-20240620', 'claude-3-5-sonnet-20241022', 'claude-3-5-sonnet'];
+                    if (m === 'deepseek') return ['deepseek-chat', 'deepseek-reasoner'];
+                    return [m || 'gpt-4o-mini'];
+                };
+                const variants = getVariants(model);
+
+                // Helper to try a list of models against a given chat function
+                const trySurface = async (chatFn) => {
+                    for (const mv of variants) {
+                        try {
+                            const opts = { model: mv, messages: payload.messages, json: payload.json };
+                            const res = await chatFn(opts);
+                            if (res) return res;
+                        } catch (_) { /* try next variant */ }
+                    }
+                    return null;
+                };
+
+                // Prefer PuterService
+                if (window.PuterService?.ai?.chat) {
+                    const res = await trySurface(window.PuterService.ai.chat);
+                    if (res) return res;
+                }
+                // Fallback to Puter SDK directly
+                if (window.Puter?.ai?.chat) {
+                    const res = await trySurface(window.Puter.ai.chat);
+                    if (res) return res;
+                }
+                // Fallback to PuterAPI shim
+                if (window.PuterAPI?.ai?.chat) {
+                    const res = await trySurface(window.PuterAPI.ai.chat);
+                    if (res) return res;
+                }
+            }
+
+            // Generic fallback: try Puter then Websim regardless of backend
+            if (window.PuterService?.ai?.chat) {
+                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                return await window.PuterService.ai.chat(opts);
+            }
+            if (window.Puter?.ai?.chat) {
+                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                return await window.Puter.ai.chat(opts);
+            }
+            if (window.PuterAPI?.ai?.chat) {
+                const opts = { model: model || payload.model || 'gpt-5-nano', messages: payload.messages, json: payload.json };
+                return await window.PuterAPI.ai.chat(opts);
+            }
+            if (window.websim?.chat?.completions) {
+                const req = { ...payload };
+                if (model) req.model = model;
+                return await websim.chat.completions.create(req);
+            }
+            throw new Error('No available AI provider found (Puter or WebSim).');
+        } catch (err) {
+            throw err;
         }
     }
 
@@ -1013,93 +852,5 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
                 preferences[`creates_${ext}`] = (preferences[`creates_${ext}`] || 0) + 1;
             });
         }
-    }
-
-    _isImageRequest(text) {
-        if (!text) return false;
-        const t = text.toLowerCase();
-        let hits = 0;
-        for (const kw of (this._imageRequestKeywords || [])) if (t.includes(kw)) hits++;
-        return hits >= (this._imageRequestThreshold || 1);
-    }
-
-    async generateImageFromMessage(prompt, opts = {}) {
-        /* @tweakable [Inline media in the existing assistant bubble when available] */ this._inlineImageInCurrentMessage = this._inlineImageInCurrentMessage ?? true;
-        /* ...existing tweakables removed for brevity ... */
-
-        try {
-            this.generatedImageUrl = null;
-            // Compose enhanced prompt with tweakable realistic style and explicit output guidance
-            const style = opts.style || this._imageGenDefaultStyle;
-            const aspect = opts.aspect_ratio || opts.aspect || this._imageGenDefaultAspect;
-            const safePrompt = `${prompt.trim()}. ${style}. photorealistic, ultra high resolution. aspect_ratio:${aspect}.`;
-            this.addConsoleMessage('info', `Image gen prompt: "${safePrompt.slice(0,180)}..."`);
-            this.showTemporaryFeedback('Generating image...', 'info');
-
-            // Prefer PuterService or websim depending on environment
-            let result = null;
-            try {
-                if (window.PuterService && typeof window.PuterService.ai?.txt2img === 'function') {
-                    result = await window.PuterService.ai.txt2img({ prompt: safePrompt, aspect_ratio: aspect });
-                } else if (window.PuterAPI && typeof window.PuterAPI.ai?.txt2img === 'function') {
-                    result = await window.PuterAPI.ai.txt2img({ prompt: safePrompt, aspect_ratio: aspect });
-                } else if (window.websim && typeof websim.imageGen === 'function') {
-                    result = await websim.imageGen({ prompt: safePrompt, aspect_ratio: aspect });
-                } else if (window.Puter && window.Puter.ai && typeof window.Puter.ai.txt2img === 'function') {
-                    result = await window.Puter.ai.txt2img({ prompt: safePrompt, aspect_ratio: aspect });
-                } else {
-                    throw new Error('No image generation provider available');
-                }
-            } catch (e) {
-                this.addConsoleMessage('warn', 'Primary image provider failed, attempting fallback: ' + e.message);
-                // last-resort fallback to websim.imageGen if earlier call failed and websim exists
-                if (window.websim && typeof websim.imageGen === 'function') result = await websim.imageGen({ prompt: safePrompt, aspect_ratio: aspect });
-            }
-
-            if (result && result.url) {
-                this.generatedImageUrl = result.url;
-                const imgFilename = `ai-image-${Date.now()}.png`;
-                this.currentFiles[imgFilename] = result.url;
-                this.saveCurrentProject();
-                this.renderFileTree();
-
-                // Ensure we attach inline into the current assistant bubble if requested
-                const targetMsg = opts.attachToMessageDiv || this.currentLoadingMessageDiv || null;
-                if (this._inlineImageInCurrentMessage && targetMsg && targetMsg.querySelector('.message-content')) {
-                    this._appendImageToMessage(targetMsg, result.url);
-                } else {
-                    // create a standard assistant message with inline image
-                    const msgEl = this.app.addMessage('assistant', `Here's an image based on your request.`, null, false, result.url);
-                    const imgEl = msgEl?.querySelector('.message-image');
-                    if (imgEl) {
-                        imgEl.style.maxWidth = `${this._chatImgMaxWidth}px`;
-                        imgEl.style.maxHeight = `${this._chatImgMaxHeight}px`;
-                        imgEl.style.objectFit = 'cover';
-                    }
-                }
-                this.showTemporaryFeedback('Image generated successfully!', 'success');
-                if (this._imgAutoOpenOverlay || opts.openOverlay) this.showImagePreviewOverlay(result.url);
-            } else {
-                throw new Error("Image provider returned no URL.");
-            }
-        } catch (error) {
-            this.hideImagePreviewOverlay();
-            this.addConsoleMessage('error', `Failed to generate image: ${error.message}`);
-            this.addMessage('assistant', `I'm sorry, I couldn't generate an image based on your request. Please try again or rephrase.`);
-            this.showTemporaryFeedback(`Failed to generate image: ${error.message}`, 'error');
-            console.error("Image generation error:", error);
-        }
-    }
-
-    _appendImageToMessage(targetMsg, imageUrl) {
-        const contentDiv = targetMsg.querySelector('.message-content');
-        const imgEl = document.createElement('img');
-        imgEl.src = imageUrl;
-        imgEl.alt = 'Generated image';
-        imgEl.className = 'message-image';
-        imgEl.style.maxWidth = `${this._chatImgMaxWidth}px`;
-        imgEl.style.maxHeight = `${this._chatImgMaxHeight}px`;
-        imgEl.style.objectFit = 'cover';
-        contentDiv.appendChild(imgEl);
     }
 }

@@ -36,91 +36,6 @@
     --file-tree-bg: #1e1f26; /* dark file tree background */
     --file-tree-font-size: 13px; /* more compact font for file tree */
     --file-tree-padding: 8px; /* tighter padding for a denser tree */
-
-    /* @tweakable [Font size (px) for Internal Scripts editor when loaded] */
-    :root { --internal-scripts-font-size: 13; }
-    /* @tweakable [Max height (px) for Internal Scripts editor area] */
-    :root { --internal-scripts-max-height: 720px; }
-
-    /* Ensure devlog-code uses dark-friendly colors when in dark theme and readable font-size tweak applied */
-    .devlog-code {
-        background-color: var(--color-bg-dark);
-        color: var(--color-text-dark);
-        padding: var(--spacing-md);
-        border: 1px solid var(--color-border);
-        border-radius: 0;
-        font-family: 'Source Code Pro', monospace;
-        font-size: var(--internal-scripts-font-size, 13px);
-        line-height: 1.45;
-        overflow-x: auto;
-        white-space: pre; /* Preserve whitespace */
-        margin: 0;
-        max-height: var(--internal-scripts-max-height, 720px); /* respect tweakable max height */
-        overflow-y: auto;
-    }
-
-    /* Small class applied when editor has loaded content to subtly adjust contrast */
-    .devlog-code--loaded {
-        background: linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02));
-        border: 1px solid rgba(255,255,255,0.03);
-    }
-
-    /* Make textarea focus match app dark theme */
-    .devlog-code:focus {
-        outline: none;
-        border-color: var(--color-primary);
-        box-shadow: 0 0 0 4px rgba(59,130,246,0.06);
-    }
-
-    /* Load new font(s) uploaded to the project */
-    /* @tweakable [Primary heading font-family name to use for headings and titles] */
-    :root { --heading-font: 'Klasky Csupo New', 'Sunkissed Forest', 'Space Mono', sans-serif; }
-    /* @tweakable [Secondary title font-family used for logo / emphasized titles] */
-    :root { --title-font: 'Sunkissed Forest', 'Klasky Csupo New', 'Space Mono', monospace; }
-
-    @font-face {
-        font-family: 'Klasky Csupo New';
-        src: url('/Klasky Csupo New.ttf') format('truetype');
-        font-weight: 700;
-        font-style: normal;
-        font-display: swap;
-    }
-
-    /* Add second uploaded font for stylized headings */
-    /* @tweakable [Secondary heading font-family file name to fine-tune heading/subheading appearance] */
-    @font-face {
-        font-family: 'Sunkissed Forest';
-        src: url('/sunkissedforest70000455_official.woff2') format('woff2'),
-             url('/sunkissedforest70000455_official.ttf') format('truetype');
-        font-weight: 700;
-        font-style: normal;
-        font-display: swap;
-    }
-
-    /* Apply heading / title fonts */
-    .logo,
-    .hand-title,
-    .reasonings-title,
-    .preview-header h3,
-    .panel-tab.active,
-    .project-section h3,
-    .project-files-section h3,
-    .comment-author-name,
-    .devlog-section h4 {
-        font-family: var(--title-font);
-        /* @tweakable [Heading font-weight for logos/titles] */
-        font-weight: 700;
-        letter-spacing: 0.2px;
-    }
-
-    h1, h2, h3, h4, h5, h6 {
-        font-family: var(--heading-font);
-        /* @tweakable [Heading color for improved contrast] */
-        color: var(--color-text-dark);
-        margin-top: 0.25em;
-        margin-bottom: 0.35em;
-    }
-
 }
 
 /* Light theme (default) */
@@ -171,112 +86,7 @@
     --file-tree-bg: var(--color-bg-secondary);
 }
 
-/* AI selector compact / square styling to match other dropdowns */
-.ai-selector-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    border: 1px solid var(--color-border);
-    background: var(--color-bg-light);
-    color: var(--color-text-dark);
-    cursor: pointer;
-    border-radius: 0; /* square corners */
-    font-weight: 600;
-    height: 36px;
-    line-height: 1;
-    min-width: var(--ai-badge-min-width);
-}
-.ai-model-select {
-    font-weight: 600;
-    height: 36px;
-    padding: 6px 8px;
-    font-size: var(--ai-select-font-size);
-}
-.ai-selector-badge.loading { opacity: 0.6; pointer-events: none; }
 
-/* Menu panel */
-.ai-model-menu {
-    position: absolute;
-    background: var(--color-bg-light);
-    border: 1px solid var(--color-border);
-    box-shadow: var(--shadow-md);
-    border-radius: 0; /* square */
-    padding: 6px;
-    z-index: 1001;
-    min-width: 240px;
-    max-width: 420px;
-    max-height: 260px;
-    overflow: hidden;
-}
-
-/* Group heading */
-.ai-model-group-heading {
-    padding: 6px 8px;
-    font-size: 12px;
-    color: var(--color-text-medium);
-    border-top: var(--ai-group-divider-thickness, 2px) solid var(--color-border);
-    border-bottom: 1px solid rgba(0,0,0,0.04);
-    background: transparent;
-}
-
-/* Individual row */
-.ai-model-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    border-radius: 0;
-    transition: background 0.12s ease, color 0.12s ease;
-}
-.ai-model-row:focus,
-.ai-model-row:hover {
-    background: var(--color-bg-dark);
-    color: var(--color-text-dark);
-    outline: none;
-}
-.ai-model-row .ai-model-provider-badge {
-    font-size: 12px;
-    color: var(--color-text-light);
-    opacity: 0.9;
-    white-space: nowrap;
-    margin-left: 8px;
-}
-
-/* Badge inner pieces */
-.ai-badge-inner { display:inline-flex; align-items:center; gap:8px; }
-.ai-badge-title { font-weight:600; }
-.ai-badge-provider { opacity:0.75; font-size:12px; margin-left:8px; }
-
-/* When the ai-model-select is present, hide the original inline SVG arrow/button inside the badge to avoid an outlined duplicate */
-.ai-model-select { 
-    background: transparent; /* let badge background show through */
-    border: 0; /* remove extra outline */
-    color: inherit;
-    font-weight: 600;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-}
-
-/* If we intentionally hide the old badge button, ensure no stray button visuals remain */
-#ai-model-badge > svg,
-#ai-model-badge > .btn {
-    display: none;
-}
-
-/* Keep the select visually compact and inline with other header controls */
-.ai-model-select:focus {
-    outline: none;
-    box-shadow: 0 0 0 4px rgba(59,130,246,0.06);
-}
-
-/* Expose tweakable CSS variables for runtime tuning (used by JS tweakables) */
-/* @tweakable [group divider thickness px] */
-:root { --ai-group-divider-thickness: 2px; }
-/* @tweakable [list max height] */
-:root { --ai-list-max-height: 200px; }
 
 * {
     margin: 0;
@@ -285,8 +95,7 @@
 }
 
 body {
-    /* @tweakable [Base UI font stack] */
-    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Inter', sans-serif; /* Simplified font stack */
     background: var(--color-bg-primary);
     color: var(--color-text-primary);
     height: 100vh;
@@ -352,8 +161,7 @@ html, body, .sidebar, .chat-messages, .console-output,
 }
 
 .logo {
-    /* @tweakable [Logo / primary title font — use uploaded fonts like 'Klasky Csupo New' or 'Sunkissed Forest'] */
-    font-family: var(--title-font);
+    font-family: 'Inter', sans-serif; /* Changed logo font to Inter for consistency */
     font-size: 24px;
     font-weight: 700;
     color: var(--color-text-primary); /* Logo color changed to text-primary for consistency */
@@ -1101,12 +909,12 @@ html, body, .sidebar, .chat-messages, .console-output,
 
 /* Code block / pre styling updated to resemble IDE (VS Code like) */
 .message-content pre {
-    background-color: #1a1f2e; /* Readable dark editor background */
-    color: #e4e7eb;
+    background-color: #0b1220; /* deep editor background for code blocks */
+    color: #cbd5e1;
     padding: 12px 14px;
-    border-radius: 0;
-    border: 1px solid rgba(255,255,255,0.06);
-    box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.04);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.02), var(--shadow-sm);
     overflow: auto;
     font-family: 'Source Code Pro', 'SFMono-Regular', 'Consolas', 'Monaco', 'Liberation Mono', monospace;
     font-size: 13px;
@@ -1115,10 +923,10 @@ html, body, .sidebar, .chat-messages, .console-output,
 
 /* Slight adjustments for inline code */
 .message-content code:not(pre code) {
-    background-color: rgba(37,99,235,0.1);
-    color: var(--color-primary);
+    background-color: rgba(255,255,255,0.03);
+    color: #7DD3FC; /* soft cyan-blue inline code */
     padding: 2px 6px;
-    border-radius: 0;
+    border-radius: 4px;
     font-family: 'Source Code Pro', monospace;
     font-size: 0.92em;
 }
@@ -1135,8 +943,8 @@ html, body, .sidebar, .chat-messages, .console-output,
 }
 
 .message.assistant .message-content {
-    background: var(--color-bg-dark); /* Darker background for better contrast */
-    color: var(--color-text-dark);
+    background: var(--color-bg-dark); /* Darker background for message bubbles */
+    color: var(--color-text-dark); /* Ensure text is visible */
 }
 
 .message-content pre code {
@@ -1542,8 +1350,7 @@ html, body, .sidebar, .chat-messages, .console-output,
     display: flex;
     gap: 8px;
     align-items: center;
-    flex-wrap: wrap; /* allow wrap on narrow widths */
-    justify-content: flex-end;
+    flex-shrink: 0;
 }
 
 /* Make header buttons uniform small size and visually aligned with select */
@@ -2680,12 +2487,12 @@ html, body, .sidebar, .chat-messages, .console-output,
 }
 
 
-/* Code block styling - keep consistent with message-content pre */
-.devlog-code, .code-editor textarea {
-    border: 1px solid var(--color-border);
-    background: var(--color-bg-primary);
-    box-shadow: var(--shadow-sm);
-    color: var(--color-text-primary);
+/* Slightly roughen code blocks borders to match sketch style */
+.message-content pre, .devlog-code, .code-editor textarea {
+    border: 1px dashed rgba(0,0,0,0.06);
+    background: linear-gradient(180deg, #fbfbfb 0%, #f6f6f6 100%);
+    box-shadow: none;
+    color: var(--color-ink);
 }
 
 .tree-file-item .file-pin {
@@ -2694,18 +2501,17 @@ html, body, .sidebar, .chat-messages, .console-output,
     opacity: 0.95;
 }
 
-/* NEW: Reasonings Panel Styles - ALWAYS VISIBLE (including deployed apps) */
+/* NEW: Reasonings Panel Styles */
 .reasonings-panel {
-    background: var(--color-bg-light);
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    margin: 12px 0;
-    overflow: hidden;
-    transition: all 0.3s ease;
-    display: block !important; /* FORCE VISIBLE - even in GitHub Pages */
+    background: var(--color-bg-dark);
+    border-top: 1px solid var(--color-border);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+    /* moved to near input so don't force large height */
 }
-/* Hide Puter account section in settings */
-#puterAccountSection { display: none !important; }
 .reasonings-panel.compact {
     font-size: 12px;
     line-height: 1.25;
@@ -2764,74 +2570,3 @@ html, body, .sidebar, .chat-messages, .console-output,
 /* collapsed state reduces to a single thin bar */
 .reasonings-panel.collapsed { max-height: 36px; overflow: hidden; }
 .reasonings-panel.collapsed .reasonings-body { display: none; }
-
-/* Bottom-right Puter notice (synced with cloudStorageStatus) */
-.puter-bottom-notice {
-    position: fixed;
-    right: 12px;
-    bottom: 12px;
-    padding: 10px 12px;
-    background: var(--color-bg-primary);
-    color: var(--color-text-dark);
-    border: 1px solid var(--color-border);
-    box-shadow: var(--shadow-sm);
-    border-radius: 0; /* square corners per design */
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.18s ease, color 0.18s ease;
-    /* Default z-index chosen to keep it above page content but below modals */
-    z-index: 700;
-    pointer-events: auto;
-}
-
-/* States */
-.puter-bottom-notice.connected {
-    background: var(--color-success-bg);
-    color: var(--color-success-text);
-    border-color: var(--color-success-bg);
-}
-.puter-bottom-notice.disconnected {
-    background: var(--color-error-bg);
-    color: var(--color-error-text);
-    border-color: var(--color-error-bg);
-}
-.puter-bottom-notice.signing {
-    background: #f59e0b; /* amber-like signing state */
-    color: #000;
-    border-color: #f59e0b;
-}
-
-/* Ensure modals and options overlay above the bottom notice */
-.github-modal, .options-modal, .custom-modal, .preview-modal, .modal-content {
-    z-index: 1000; /* higher than .puter-bottom-notice */
-}
-
-/* NEW: Code Actions for Internal Scripts */
-.code-actions #refreshInternalScriptsBtn,
-.code-actions #copyForAIBtn,
-.code-actions #summarizeAIBtn {
-    min-width: 96px;
-    padding: 6px 10px;
-    font-size: 13px;
-    height: 34px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-/* Slight spacing and responsive wrapping for the new actions group */
-.code-header .code-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap; /* allow wrap on narrow widths */
-    justify-content: flex-end;
-}
-
-/* Tweak for mobile so buttons don't overflow */
-@media (max-width: 900px) {
-    .code-header { gap: 8px; }
-    .code-actions { width: 100%; justify-content: flex-start; }
-    .code-actions button { flex: 1 1 auto; min-width: 44%; }
-}
