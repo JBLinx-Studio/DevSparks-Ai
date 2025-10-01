@@ -1,25 +1,25 @@
-// Unified AI model selector - WebSim, Puter.AI, and Google Gemini (via Lovable Gateway)
+// Unified AI model selector - WebSim, Puter.AI, and Lovable AI (FREE Gemini!)
 const MODELS = [
-  // Google Gemini - FREE Models via Lovable Gateway (Sept 29 - Oct 6)
-  {id: 'lovable:gemini-flash', label: 'Gemini 2.5 Flash', provider: 'Google', desc: 'FREE - Fast & balanced (default)', category: 'gemini', isFree: true, status: 'checking'},
-  {id: 'lovable:gemini-pro', label: 'Gemini 2.5 Pro', provider: 'Google', desc: 'FREE - Most capable, complex reasoning', category: 'gemini', isFree: true, status: 'checking'},
-  {id: 'lovable:gemini-lite', label: 'Gemini 2.5 Lite', provider: 'Google', desc: 'FREE - Ultra-fast, simple tasks', category: 'gemini', isFree: true, status: 'checking'},
+  // Lovable AI - FREE Gemini Models (Sept 29 - Oct 6)
+  {id: 'lovable:gemini-flash', label: 'Gemini 2.5 Flash', provider: 'Lovable AI', desc: 'FREE - Fast & balanced (default)', category: 'lovable', isFree: true},
+  {id: 'lovable:gemini-pro', label: 'Gemini 2.5 Pro', provider: 'Lovable AI', desc: 'FREE - Most capable, complex reasoning', category: 'lovable', isFree: true},
+  {id: 'lovable:gemini-lite', label: 'Gemini 2.5 Lite', provider: 'Lovable AI', desc: 'FREE - Ultra-fast, simple tasks', category: 'lovable', isFree: true},
   
-  // WebSim AI (Only works in WebSim.com environment)
-  {id: 'websim:gpt5-nano', label: 'WebSim AI', provider: 'WebSim', desc: 'Only available in WebSim.com', category: 'websim', status: 'checking'},
+  // WebSim AI (Main)
+  {id: 'websim:gpt5-nano', label: 'WebSim AI', provider: 'WebSim', desc: 'Default WebSim assistant', category: 'websim'},
 
-  // Puter.AI Free Unlimited Models (requires Puter account)
-  {id: 'puter:gpt-5', label: 'GPT-5', provider: 'Puter.AI', desc: 'OpenAI GPT-5 via Puter (free)', category: 'puter', status: 'checking'},
-  {id: 'puter:claude-sonnet', label: 'Claude Sonnet 4', provider: 'Puter.AI', desc: 'Anthropic Claude via Puter (free)', category: 'puter', status: 'checking'},
-  {id: 'puter:deepseek-r1', label: 'DeepSeek R1', provider: 'Puter.AI', desc: 'Advanced reasoning via Puter (free)', category: 'puter', status: 'checking'},
-  {id: 'puter:llama-3.3', label: 'Llama 3.3 70B', provider: 'Puter.AI', desc: 'Meta Llama via Puter (free)', category: 'puter', status: 'checking'}
+  // Puter.AI Free Unlimited Models (aligned with chatManager.js)
+  {id: 'puter:gpt-5', label: 'OpenAI GPT‑5 (via Puter)', provider: 'Puter.AI', desc: 'Free unlimited via Puter', category: 'puter'},
+  {id: 'puter:claude-sonnet', label: 'Claude Sonnet (via Puter)', provider: 'Puter.AI', desc: 'Free unlimited via Puter', category: 'puter'},
+  {id: 'puter:deepseek-r1', label: 'DeepSeek R1 (via Puter)', provider: 'Puter.AI', desc: 'Free unlimited via Puter', category: 'puter'},
+  {id: 'puter:llama-3.3', label: 'Llama 3.3 70B (via Puter)', provider: 'Puter.AI', desc: 'Free unlimited via Puter', category: 'puter'}
 ];
 
 /* @tweakable [Labels for selector groups: shown as headings inside the model list] */
 const AI_SELECTOR_GROUP_LABELS = {
-  gemini: 'Google Gemini (FREE - Limited Time)',
-  websim: 'WebSim AI (WebSim.com only)',
-  puter: 'Puter.AI (Free with Puter Account)'
+  lovable: 'Lovable AI (FREE Gemini - Limited Time)',
+  websim: 'WebSim AI',
+  puter: 'Puter.AI (Free & Unlimited)'
 };
 
 /* @tweakable [Minimum width for the model badge button (px) — helps align inside header] */
@@ -53,13 +53,13 @@ function createSelector() {
   select.innerHTML = '';
 
   // Populate select with grouped options
-  const groups = { gemini: [], websim: [], puter: [] };
+  const groups = { lovable: [], websim: [], puter: [] };
   MODELS.forEach(m => {
-    const category = m.category || 'gemini';
+    const category = m.category || 'websim';
     if (groups[category]) groups[category].push(m);
   });
   
-  console.log('✓ Grouped models:', { gemini: groups.gemini.length, websim: groups.websim.length, puter: groups.puter.length });
+  console.log('✓ Grouped models:', { lovable: groups.lovable.length, websim: groups.websim.length, puter: groups.puter.length });
 
   // Create optgroups matching the AI Thoughts style
   const createOptGroup = (label, items) => {
@@ -80,8 +80,8 @@ function createSelector() {
     console.log(`✓ Added ${items.length} models to group: ${label}`);
   };
 
-  // Order: Google Gemini FREE first, then WebSim, then Puter
-  createOptGroup(AI_SELECTOR_GROUP_LABELS.gemini, groups.gemini);
+  // Order: Lovable AI FREE first
+  createOptGroup(AI_SELECTOR_GROUP_LABELS.lovable, groups.lovable);
   createOptGroup(AI_SELECTOR_GROUP_LABELS.websim, groups.websim);
   createOptGroup(AI_SELECTOR_GROUP_LABELS.puter, groups.puter);
   
@@ -117,36 +117,16 @@ function createSelector() {
     window.__lastSelectedModel = model;
     console.info('✓ AI Model changed to:', model.label, `(${model.provider})`);
 
-    // If a Puter model is selected, ensure user is signed in
+    // If a Puter model is selected, auto-prompt sign-in only here (no other UI prompts)
     if (id.startsWith('puter:')) {
-      console.log('🟣 Puter model selected, checking authentication...');
-      const signedIn = !!(window.Puter?.auth?.currentUser || window.PuterShim?.user);
-      
-      if (!signedIn) {
-        console.log('🟣 Not signed in, prompting Puter authentication...');
+      const signedIn = !!(window.Puter?.auth?.currentUser);
+      if (!signedIn && window.Puter?.auth?.signIn) {
         try {
-          // Use PuterShim for consistent sign-in experience
-          if (window.PuterShim?.ensureSignedInInteractive) {
-            await window.PuterShim.ensureSignedInInteractive();
-            console.log('✅ Puter sign-in successful');
-          } else if (window.Puter?.auth?.signIn) {
-            await window.Puter.auth.signIn();
-            console.log('✅ Puter sign-in successful (direct SDK)');
-          } else {
-            console.error('❌ Puter SDK not available');
-            alert('Puter AI requires signing in. Please ensure the Puter SDK is loaded and try again.');
-          }
+          await window.Puter.auth.signIn();
           window.dispatchEvent(new CustomEvent('puter:signin', { detail: window.Puter?.auth?.currentUser || null }));
         } catch (err) {
-          console.error('❌ Puter sign-in failed:', err);
-          alert(`Puter sign-in was cancelled or failed: ${err.message}\n\nPuter AI models require a free Puter account. Please try again or select a different AI model.`);
-          // Revert to Gemini Flash
-          select.value = 'lovable:gemini-flash';
-          select.dispatchEvent(new Event('change'));
-          return;
+          console.warn('Puter sign-in cancelled or failed', err);
         }
-      } else {
-        console.log('✅ Already signed in to Puter');
       }
     }
 

@@ -10,8 +10,6 @@
     <script src="https://js.puter.com/v2/"></script>
     <!-- Puter quick initializer: auto-check sign-in, show click-to-sign-in banner, expose testing helpers -->
     <script type="module" src="puter-init.js"></script>
-    <!-- AI Status Manager: monitors and displays connection status for all AI models -->
-    <script src="ai-status-manager.js"></script>
 
     <!-- Monaco loader (AMD) for the in-browser Monaco Editor -->
     <script src="https://unpkg.com/monaco-editor@0.39.0/min/vs/loader.js"></script>
@@ -40,25 +38,24 @@
                 <!-- AI model selector (styled like AI Thoughts dropdown) -->
                 <div id="ai-model-selector" style="display:flex;align-items:center;gap:8px;">
                   <label for="aiModelSelect" style="font-size:13px;color:var(--color-text-dark);font-weight:600;">AI Model</label>
-                  <select id="aiModelSelect" class="form-select" aria-label="AI model" style="min-width:280px;">
-                    <optgroup label="Google Gemini (FREE - Limited Time)">
-                      <option value="lovable:gemini-flash" selected>Gemini 2.5 Flash - FREE - Fast & balanced</option>
-                      <option value="lovable:gemini-pro">Gemini 2.5 Pro - FREE - Most capable</option>
-                      <option value="lovable:gemini-lite">Gemini 2.5 Lite - FREE - Ultra-fast</option>
+                  <select id="aiModelSelect" class="form-select" aria-label="AI model" style="min-width:220px;">
+                    <optgroup label="Lovable AI (FREE Gemini - Limited Time)">
+                      <option value="lovable:gemini-flash" selected>Gemini 2.5 Flash - FREE - Fast & balanced (default)</option>
+                      <option value="lovable:gemini-pro">Gemini 2.5 Pro - FREE - Most capable, complex reasoning</option>
+                      <option value="lovable:gemini-lite">Gemini 2.5 Lite - FREE - Ultra-fast, simple tasks</option>
                     </optgroup>
-                    <optgroup label="WebSim AI (WebSim.com only)">
-                      <option value="websim:gpt5-nano">WebSim AI - Only works in WebSim.com</option>
+                    <optgroup label="WebSim AI">
+                      <option value="websim:gpt5-nano">WebSim AI - Default WebSim assistant</option>
                     </optgroup>
-                    <optgroup label="Puter.AI (Free with Puter Account)">
-                      <option value="puter:gpt-5">GPT-5 - OpenAI via Puter</option>
-                      <option value="puter:claude-sonnet">Claude Sonnet 4 - Anthropic via Puter</option>
-                      <option value="puter:deepseek-r1">DeepSeek R1 - Advanced reasoning via Puter</option>
-                      <option value="puter:llama-3.3">Llama 3.3 70B - Meta via Puter</option>
+                    <optgroup label="Puter.AI (Free & Unlimited with Account)">
+                      <option value="puter:gpt-5">GPT-5 - Powered by OpenAI, free via Puter</option>
+                      <option value="puter:claude-sonnet">Claude Sonnet 4 - Anthropic's latest, free via Puter</option>
+                      <option value="puter:deepseek-r1">DeepSeek R1 - Advanced reasoning model, free via Puter</option>
+                      <option value="puter:llama-3.3">Llama 3.3 70B - Meta's open model, free via Puter</option>
+                    </optgroup>
+                      <option value="puter:deepseek">DeepSeek - Free unlimited via Puter</option>
                     </optgroup>
                   </select>
-                  <div id="aiModelStatus" style="font-size:11px;color:var(--color-text-medium);margin-left:8px;">
-                    <span id="aiStatusIndicator">●</span> <span id="aiStatusText">Ready</span>
-                  </div>
                 </div>
                 <div class="header-actions">
                     <button class="theme-toggle" id="themeToggle">
