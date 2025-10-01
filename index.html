@@ -39,7 +39,19 @@
                 <div id="ai-model-selector" style="display:flex;align-items:center;gap:8px;">
                   <label for="aiModelSelect" style="font-size:13px;color:var(--color-text-dark);font-weight:600;">AI Model</label>
                   <select id="aiModelSelect" class="form-select" aria-label="AI model" style="min-width:220px;">
-                    <!-- populated by script -->
+                    <optgroup label="🆓 Lovable AI (FREE Gemini - Limited Time!)">
+                      <option value="lovable:gemini-flash" selected>🆓 ⚡ Gemini 2.5 Flash - FREE - Fast & balanced (default)</option>
+                      <option value="lovable:gemini-pro">🆓 🚀 Gemini 2.5 Pro - FREE - Most capable, complex reasoning</option>
+                      <option value="lovable:gemini-lite">🆓 ⚡ Gemini 2.5 Lite - FREE - Ultra-fast, simple tasks</option>
+                    </optgroup>
+                    <optgroup label="🌐 WebSim AI">
+                      <option value="websim:gpt5-nano">WebSim AI - Default WebSim assistant</option>
+                    </optgroup>
+                    <optgroup label="🟢 Puter.AI (Free & Unlimited)">
+                      <option value="puter:openai">OpenAI GPT - Free unlimited via Puter</option>
+                      <option value="puter:claude-35-sonnet">Claude 3.5 Sonnet - Free unlimited via Puter</option>
+                      <option value="puter:deepseek">DeepSeek - Free unlimited via Puter</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div class="header-actions">
