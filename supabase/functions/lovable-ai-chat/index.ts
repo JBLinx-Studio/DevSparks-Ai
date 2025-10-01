@@ -10,17 +10,11 @@ serve(async (req) => {
 
   try {
     const { messages, model } = await req.json();
-    console.log('📥 Received request with model:', model, 'messages:', messages?.length);
-    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error('❌ LOVABLE_API_KEY not configured');
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     // Default to free Gemini Flash model
     const selectedModel = model || "google/gemini-2.5-flash";
-    console.log('🤖 Using model:', selectedModel);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -40,8 +34,6 @@ serve(async (req) => {
         stream: false,
       }),
     });
-
-    console.log('📡 Gateway response status:', response.status);
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -65,7 +57,6 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log('✅ Success! Returning response');
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
