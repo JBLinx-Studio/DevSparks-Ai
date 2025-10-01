@@ -336,7 +336,7 @@ function showSignInPrompt(autoOpen = false) {
         document.getElementById(id)?.remove();
       } catch (e) {
         // more explicit user guidance when sign-in fails inside iframe (websim)
-        alert('Sign-in failed: ' + (e?.message || e) + '\nIf you are inside Websim, allow popups and complete sign-in in the opened window. If continued failure occurs, run the Puter Diagnostic widget.');
+        if (window.app?.showTemporaryFeedback) { window.app.showTemporaryFeedback('Puter sign-in failed: ' + (e?.message || e), 'error'); } else { console.warn('Puter sign-in failed:', e); }
       }
     });
     document.getElementById(`${id}-close`).addEventListener('click', () => d.remove());
@@ -594,7 +594,8 @@ window.PuterShim.showStorageInfo = async function() {
     modal.appendChild(pre);
     document.body.appendChild(modal);
   } catch (e) {
-    alert(lines.join('\n\n'));
+    console.info(lines.join('\n\n'));
+    if (window.app?.showTemporaryFeedback) window.app.showTemporaryFeedback('Puter account info printed to console.', 'info');
   }
 };
 
@@ -635,7 +636,7 @@ function formatBytes(bytes) {
             await PuterShim.showStorageInfo();
           } catch (e) {
             console.warn('showStorageInfo failed:', e);
-            alert('Failed to retrieve Puter info: ' + (e?.message || e));
+            if (window.app?.showTemporaryFeedback) window.app.showTemporaryFeedback('Failed to retrieve Puter info: ' + (e?.message || e), 'error');
           }
         });
       }
@@ -723,7 +724,8 @@ function formatBytes(bytes) {
             document.getElementById(`${id}-close`).addEventListener('click', () => modal.remove());
           } catch (e) {
             // fallback to alert
-            alert(out.join('\n'));
+            console.info(out.join('\n'));
+            if (window.app?.showTemporaryFeedback) window.app.showTemporaryFeedback('Puter connectivity test printed to console.', 'info');
           }
         });
       }
@@ -773,7 +775,7 @@ function formatBytes(bytes) {
       }
       if (optStorageInfoBtn) {
         optStorageInfoBtn.addEventListener('click', async () => {
-          try { await PuterShim.showStorageInfo(); } catch (e) { console.warn('showStorageInfo failed:', e); alert('Failed to retrieve Puter info: ' + (e?.message || e)); }
+          try { await PuterShim.showStorageInfo(); } catch (e) { console.warn('showStorageInfo failed:', e); if (window.app?.showTemporaryFeedback) window.app.showTemporaryFeedback('Failed to retrieve Puter info: ' + (e?.message || e), 'error'); }
         });
       }
     };

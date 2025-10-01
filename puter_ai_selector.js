@@ -134,12 +134,18 @@ function createSelector() {
             console.log('✅ Puter sign-in successful (direct SDK)');
           } else {
             console.error('❌ Puter SDK not available');
-            alert('Puter AI requires signing in. Please ensure the Puter SDK is loaded and try again.');
+            if (window.app?.showTemporaryFeedback) {
+              window.app.showTemporaryFeedback('Puter SDK not loaded. Please reload the page and try again.', 'error');
+            } else {
+              console.error('Puter SDK not loaded.');
+            }
           }
           window.dispatchEvent(new CustomEvent('puter:signin', { detail: window.Puter?.auth?.currentUser || null }));
         } catch (err) {
           console.error('❌ Puter sign-in failed:', err);
-          alert(`Puter sign-in was cancelled or failed: ${err.message}\n\nPuter AI models require a free Puter account. Please try again or select a different AI model.`);
+          if (window.app?.showTemporaryFeedback) {
+            window.app.showTemporaryFeedback(`Puter sign-in failed: ${err?.message || err}`, 'error');
+          }
           // Revert to Gemini Flash
           select.value = 'lovable:gemini-flash';
           select.dispatchEvent(new Event('change'));
