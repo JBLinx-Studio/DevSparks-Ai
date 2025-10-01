@@ -1,17 +1,22 @@
-// Unified AI model selector - connects Settings and AI Assistant dropdowns
-// Only includes WebSim main AI and Puter's 3 specific free unlimited models
+// Unified AI model selector - WebSim, Puter.AI, and Lovable AI (FREE Gemini!)
 const MODELS = [
+  // 🆓 Lovable AI - FREE Gemini Models (Sept 29 - Oct 6)
+  {id: 'lovable:gemini-flash', label: '⚡ Gemini 2.5 Flash', provider: 'Lovable AI', desc: '🆓 FREE - Fast & balanced (default)', category: 'lovable', isFree: true},
+  {id: 'lovable:gemini-pro', label: '🚀 Gemini 2.5 Pro', provider: 'Lovable AI', desc: '🆓 FREE - Most capable, complex reasoning', category: 'lovable', isFree: true},
+  {id: 'lovable:gemini-lite', label: '⚡ Gemini 2.5 Lite', provider: 'Lovable AI', desc: '🆓 FREE - Ultra-fast, simple tasks', category: 'lovable', isFree: true},
+  
   // WebSim AI (Main)
-  {id: 'websim:gpt5-nano', label: 'WebSim AI', provider: 'WebSim', desc: 'Default WebSim assistant - fast and efficient', category: 'websim'},
+  {id: 'websim:gpt5-nano', label: 'WebSim AI', provider: 'WebSim', desc: 'Default WebSim assistant', category: 'websim'},
 
-  // Puter.AI Free Unlimited Models (from official tutorials)
-  {id: 'puter:openai', label: 'OpenAI GPT', provider: 'Puter.AI', desc: 'Free unlimited OpenAI API via Puter', category: 'puter'},
-  {id: 'puter:claude-35-sonnet', label: 'Claude 3.5 Sonnet', provider: 'Puter.AI', desc: 'Free unlimited Claude 3.5 Sonnet via Puter', category: 'puter'},
-  {id: 'puter:deepseek', label: 'DeepSeek', provider: 'Puter.AI', desc: 'Free unlimited DeepSeek API via Puter', category: 'puter'}
+  // Puter.AI Free Unlimited Models
+  {id: 'puter:openai', label: 'OpenAI GPT', provider: 'Puter.AI', desc: 'Free unlimited OpenAI via Puter', category: 'puter'},
+  {id: 'puter:claude-35-sonnet', label: 'Claude 3.5 Sonnet', provider: 'Puter.AI', desc: 'Free unlimited Claude via Puter', category: 'puter'},
+  {id: 'puter:deepseek', label: 'DeepSeek', provider: 'Puter.AI', desc: 'Free unlimited DeepSeek via Puter', category: 'puter'}
 ];
 
 /* @tweakable [Labels for selector groups: shown as headings inside the model list] */
 const AI_SELECTOR_GROUP_LABELS = {
+  lovable: '🆓 Lovable AI (FREE Gemini - Limited Time!)',
   websim: '🌐 WebSim AI',
   puter: '🟢 Puter.AI (Free & Unlimited)'
 };
@@ -64,7 +69,7 @@ function createSelector() {
   function renderItems(filter='') {
     list.innerHTML = '';
     // categorize models by their category
-    const groups = { websim: [], puter: [] };
+    const groups = { lovable: [], websim: [], puter: [] };
     MODELS.forEach(m=>{
       if (filter && !`${m.label} ${m.provider} ${m.desc} ${m.id}`.toLowerCase().includes(filter.toLowerCase())) return;
       const category = m.category || 'websim';
@@ -121,7 +126,8 @@ function createSelector() {
       list.appendChild(sep);
     };
 
-    // order: WebSim first (default), then Puter.AI
+    // order: Lovable AI FREE first, then WebSim, then Puter.AI
+    appendGroup(AI_SELECTOR_GROUP_LABELS.lovable, groups.lovable);
     appendGroup(AI_SELECTOR_GROUP_LABELS.websim, groups.websim);
     appendGroup(AI_SELECTOR_GROUP_LABELS.puter, groups.puter);
 
@@ -136,7 +142,7 @@ function createSelector() {
 
   // selection logic
   async function loadPreferred() {
-    let pref = 'websim:gpt5-nano'; // Default to WebSim
+    let pref = 'lovable:gemini-flash'; // Default to FREE Lovable AI Gemini Flash
     try { pref = (window.getPreferredModel && await window.getPreferredModel()) || localStorage.getItem('preferredModel') || pref; } catch {}
     const found = MODELS.find(m=>m.id===pref) || MODELS[0];
     updateBadge(found);
@@ -229,7 +235,7 @@ function createSelector() {
         if (v) return v;
       }
     } catch {}
-    return localStorage.getItem('preferredModel') || 'websim:gpt5-nano';
+    return localStorage.getItem('preferredModel') || 'lovable:gemini-flash';
   };
   window.setPreferredModel = async (id) => {
     try {

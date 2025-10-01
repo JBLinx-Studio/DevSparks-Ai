@@ -664,13 +664,58 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
         }
     }
 
-    // Request AI with explicit provider routing and clearer timeouts/fallbacks
+    // Request AI with auto-fallback rotation between Lovable AI, WebSim, and Puter
     async requestAIResponse(payload) {
         const FALLBACK_TIMEOUT_MS = this.FALLBACK_TIMEOUT_MS || FALLBACK_TIMEOUT_MS_DEFAULT;
-        // Preferred provider resolution order:
-        // 1) If running inside Websim -> websim first, then Puter
-        // 2) Outside Websim -> Puter (PuterAPI / PuterService / Puter SDK) first, then websim as last resort
         const runningInWebsim = typeof window.websim !== 'undefined';
+        
+        // Get selected model from AI selector
+        let selectedModel = 'lovable:gemini-flash';
+        try { 
+            selectedModel = (window.getPreferredModel && await window.getPreferredModel()) || 
+                           window.__lastSelectedModel?.id || 
+                           this.app.aiProvider || 
+                           selectedModel; 
+        } catch {}
+
+        // Map model IDs to providers and API models
+        const modelMap = {
+            'lovable:gemini-flash': { provider: 'lovable', model: 'google/gemini-2.5-flash' },
+            'lovable:gemini-pro': { provider: 'lovable', model: 'google/gemini-2.5-pro' },
+            'lovable:gemini-lite': { provider: 'lovable', model: 'google/gemini-2.5-flash-lite' },
+            'websim:gpt5-nano': { provider: 'websim', model: null },
+            'puter:openai': { provider: 'puter', model: 'gpt-4o' },
+            'puter:claude-35-sonnet': { provider: 'puter', model: 'claude-3.5-sonnet' },
+            'puter:deepseek': { provider: 'puter', model: 'deepseek-chat' }
+        };
+
+        const modelInfo = modelMap[selectedModel] || { provider: 'lovable', model: 'google/gemini-2.5-flash' };
+
+        // Define provider call functions
+        const callLovableAI = async () => {
+            const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL;
+            if (!supabaseUrl) throw new Error('Lovable AI not configured');
+            
+            const response = await fetch(`${supabaseUrl}/functions/v1/lovable-ai-chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY}`
+                },
+                body: JSON.stringify({
+                    messages: payload.messages,
+                    model: modelInfo.model
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Lovable AI error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content || data.content || '';
+        };
 
         const callWebsim = async () => {
             if (runningInWebsim && window.websim?.chat?.completions?.create) {
@@ -680,30 +725,46 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
         };
 
         const callPuter = async () => {
-            // Use the highest-level wrapper available to ensure consistent signatures
             if (window.PuterAPI?.ai?.chat) return await window.PuterAPI.ai.chat(payload);
             if (window.PuterService?.ai?.chat) return await window.PuterService.ai.chat(payload);
-            if (window.Puter && window.Puter.ai && typeof window.Puter.ai.chat === 'function') return await window.Puter.ai.chat(payload);
-            if (window.PuterShim && typeof window.PuterShim.ai?.chat === 'function') return await window.PuterShim.ai.chat(payload);
+            if (window.Puter?.ai?.chat) return await window.Puter.ai.chat(payload);
+            if (window.PuterShim?.ai?.chat) return await window.PuterShim.ai.chat(payload);
             throw new Error('Puter AI not available');
         };
 
-        // Try preferred then fallback with short timeout racing to avoid blocking UI
-        if (runningInWebsim) {
+        // Auto-fallback rotation: try selected provider first, then rotate through others
+        const providers = [
+            { name: 'lovable', fn: callLovableAI },
+            { name: 'websim', fn: callWebsim },
+            { name: 'puter', fn: callPuter }
+        ];
+
+        // Prioritize the selected provider, then try others
+        const selectedProvider = providers.find(p => p.name === modelInfo.provider);
+        const otherProviders = providers.filter(p => p.name !== modelInfo.provider);
+        const orderedProviders = selectedProvider ? [selectedProvider, ...otherProviders] : providers;
+
+        let lastError;
+        for (const provider of orderedProviders) {
             try {
-                return await callWebsim();
-            } catch (e) {
-                // fallback to Puter with timeout
-                return await Promise.race([callPuter(), new Promise((_, r) => setTimeout(() => r(new Error('Puter timeout')), FALLBACK_TIMEOUT_MS))]).catch(() => { throw new Error('No AI provider available'); });
-            }
-        } else {
-            try {
-                return await callPuter();
-            } catch (e) {
-                // fallback to websim if available
-                return await Promise.race([callWebsim(), new Promise((_, r) => setTimeout(() => r(new Error('Websim timeout')), FALLBACK_TIMEOUT_MS))]).catch(() => { throw new Error('No AI provider available'); });
+                console.log(`Trying AI provider: ${provider.name}`);
+                const result = await Promise.race([
+                    provider.fn(),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error(`${provider.name} timeout`)), FALLBACK_TIMEOUT_MS)
+                    )
+                ]);
+                console.log(`✓ ${provider.name} responded successfully`);
+                return result;
+            } catch (error) {
+                console.warn(`✗ ${provider.name} failed:`, error.message);
+                lastError = error;
+                // Continue to next provider
             }
         }
+
+        // All providers failed
+        throw new Error(`All AI providers failed. Last error: ${lastError?.message || 'Unknown error'}`);
     }
 
     async handleCreateProjectCommand(userMessage) {
