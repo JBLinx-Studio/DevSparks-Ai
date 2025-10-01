@@ -229,8 +229,19 @@
 
                     <div class="panel-content" id="devLogPanelContent">
                         <div class="devlog-section">
-                            <h4>DevSpark AI Internal Scripts</h4>
-                            <p style="color: var(--color-text-medium); margin-bottom: var(--spacing-lg);">
+                            <div class="code-header" style="border-bottom:1px solid var(--color-border);align-items:center;">
+                                <div class="file-info" style="display:flex;align-items:center;gap:12px;">
+                                    <h4 style="margin:0;">DevSpark AI Internal Scripts</h4>
+                                    <span style="color:var(--color-text-medium);font-size:13px;">(internal)</span>
+                                </div>
+                                <div class="code-actions" style="margin-left:auto;">
+                                    <!-- single refresh button for internal scripts -->
+                                    <button id="refreshInternalScriptsBtn" class="btn btn-secondary btn-sm" title="Refresh list">Refresh</button>
+                                    <button id="copyForAIBtn" class="btn btn-secondary btn-sm" title="Copy selected script for AI">Copy for AI</button>
+                                    <button id="summarizeAIBtn" class="btn btn-primary btn-sm" title="Summarize (AI)">Summarize (AI)</button>
+                                </div>
+                            </div>
+                            <p style="color: var(--color-text-medium); margin:var(--spacing-md) 0 var(--spacing-lg) 0;">
                                 Below are the internal scripts and source code that power DevSpark AI. This is provided for transparency and debugging purposes.
                             </p>
                             <div id="devLogContent">

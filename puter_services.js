@@ -160,30 +160,48 @@ const PuterService = {
   ai: {
     async chat(opts = {}) {
       await PuterService.ready();
-      if (window.Puter && window.Puter.ai && typeof window.Puter.ai.chat === 'function') {
-        return window.Puter.ai.chat(opts);
+      // Preferred order:
+      // 1) PuterAPI (explicit API wrapper)
+      // 2) PuterService (local wrapper)
+      // 3) Puter native SDK (window.Puter.ai)
+      // 4) PuterShim.ai (fallback shim)
+      // 5) websim (only when inside websim)
+      if (window.PuterAPI?.ai?.chat) return window.PuterAPI.ai.chat(opts);
+      if (window.PuterService?.ai?.chat && window.PuterService !== PuterService) {
+        // If another PuterService was attached earlier use it, otherwise prefer our local PuterService implementation (this module).
+        return window.PuterService.ai.chat(opts);
       }
-      throw new Error('Puter.ai.chat not available in this environment');
+      if (window.Puter && window.Puter.ai && typeof window.Puter.ai.chat === 'function') return window.Puter.ai.chat(opts);
+      if (window.PuterShim && typeof window.PuterShim.ai?.chat === 'function') return window.PuterShim.ai.chat(opts);
+      if (window.websim && websim.chat && websim.chat.completions && typeof websim.chat.completions.create === 'function') {
+        return websim.chat.completions.create(opts);
+      }
+      throw new Error('No AI chat provider available');
     },
     async txt2img(opts = {}) {
       await PuterService.ready();
-      if (window.Puter && window.Puter.ai && typeof window.Puter.ai.txt2img === 'function') {
-        return window.Puter.ai.txt2img(opts);
-      }
-      throw new Error('Puter.ai.txt2img not available');
+      if (window.PuterAPI?.ai?.txt2img) return window.PuterAPI.ai.txt2img(opts);
+      if (window.PuterService?.ai?.txt2img && window.PuterService !== PuterService) return window.PuterService.ai.txt2img(opts);
+      if (window.Puter && window.Puter.ai && typeof window.Puter.ai.txt2img === 'function') return window.Puter.ai.txt2img(opts);
+      if (window.PuterShim && typeof window.PuterShim.ai?.txt2img === 'function') return window.PuterShim.ai.txt2img(opts);
+      if (window.websim && websim.imageGen) return websim.imageGen(opts);
+      throw new Error('No image generation provider available');
     },
     async img2txt(opts = {}) {
       await PuterService.ready();
-      if (window.Puter && window.Puter.ai && typeof window.Puter.ai.img2txt === 'function') {
-        return window.Puter.ai.img2txt(opts);
-      }
+      if (window.PuterAPI?.ai?.img2txt) return window.PuterAPI.ai.img2txt(opts);
+      if (window.PuterService?.ai?.img2txt) return window.PuterService.ai.img2txt(opts);
+      if (window.Puter && window.Puter.ai && typeof window.Puter.ai.img2txt === 'function') return window.Puter.ai.img2txt(opts);
+      if (window.PuterShim && typeof window.PuterShim.ai?.img2txt === 'function') return window.PuterShim.ai.img2txt(opts);
       throw new Error('Puter.ai.img2txt not available');
     },
     async txt2speech(opts = {}) {
       await PuterService.ready();
-      if (window.Puter && window.Puter.ai && typeof window.Puter.ai.txt2speech === 'function') {
-        return window.Puter.ai.txt2speech(opts);
-      }
+      if (window.PuterAPI?.ai?.txt2speech) return window.PuterAPI.ai.txt2speech(opts);
+      if (window.PuterService?.ai?.txt2speech) return window.PuterService.ai.txt2speech(opts);
+      if (window.Puter && window.Puter.ai && typeof window.Puter.ai.txt2speech === 'function') return window.Puter.ai.txt2speech(opts);
+      if (window.PuterShim && typeof window.PuterShim.ai?.txt2speech === 'function') return window.PuterShim.ai.txt2speech(opts);
+      if (window.websim && websim.textToSpeech) return websim.textToSpeech(opts);
       throw new Error('Puter.ai.txt2speech not available');
     }
   },
@@ -246,6 +264,72 @@ const PuterService = {
     return out;
   }
 };
+
+// Expose an Internal Scripts manifest so the Internal Scripts panel can quickly index,
+// surface metadata, and let AIs reason about what each script does.
+//
+// Each internal script can call window.InternalScripts.register({ id, title, description, tags, version, path })
+// to register itself. The UI can then call window.InternalScripts.getManifest() to show a compact, searchable list.
+//
+// @tweakable [maxManifestEntries — how many scripts to keep in the in-memory manifest for quick inspection]
+/* @tweakable [maxManifestEntries] */
+window.InternalScripts = (function () {
+  const MAX = Number(window.__INTERNAL_SCRIPTS_MAX__ || 120) || 120;
+  const store = new Map();
+
+  function register(meta = {}) {
+    try {
+      if (!meta || !meta.id) throw new Error('InternalScripts.register requires an id');
+      meta.registeredAt = new Date().toISOString();
+      meta.sourcePreview = meta.sourcePreview || null; // optional short snippet
+      store.set(meta.id, { ...meta });
+      // prune if needed
+      if (store.size > MAX) {
+        const keys = Array.from(store.keys()).slice(0, store.size - MAX);
+        keys.forEach(k => store.delete(k));
+      }
+      // broadcast so UI panels (and AI agents) can update live
+      window.dispatchEvent(new CustomEvent('internal-scripts:updated', { detail: { id: meta.id, meta } }));
+      return true;
+    } catch (e) {
+      console.warn('InternalScripts.register failed', e);
+      return false;
+    }
+  }
+
+  function getManifest() {
+    return Array.from(store.values()).sort((a, b) => (a.title || a.id).localeCompare(b.title || b.id));
+  }
+
+  function get(id) {
+    return store.get(id) || null;
+  }
+
+  function clear() {
+    store.clear();
+    window.dispatchEvent(new CustomEvent('internal-scripts:cleared'));
+  }
+
+  // Helper: create a lightweight manifest entry from a loaded script element
+  async function ingestScriptElement(scriptEl) {
+    try {
+      const id = scriptEl.id || scriptEl.getAttribute('data-script-id') || `script:${Math.random().toString(36).slice(2,8)}`;
+      const path = scriptEl.src || scriptEl.getAttribute('data-path') || null;
+      let preview = null;
+      if (!path && scriptEl.textContent) preview = scriptEl.textContent.trim().slice(0, 800);
+      register({ id, title: scriptEl.getAttribute('data-title') || id, description: scriptEl.getAttribute('data-desc') || '', path, sourcePreview: preview, tags: ['auto-ingested'] });
+      return id;
+    } catch (e) { return null; }
+  }
+
+  // Auto-ingest <script data-internal-script> nodes so Internal Scripts panel is populated automatically
+  try {
+    const nodes = Array.from(document.querySelectorAll('script[data-internal-script]'));
+    nodes.forEach(n => ingestScriptElement(n));
+  } catch (e) {}
+
+  return { register, getManifest, get, clear, ingestScriptElement };
+}());
 
 window.PuterService = PuterService;
 export default PuterService;

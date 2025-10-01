@@ -4,6 +4,14 @@
 
 /* @tweakable [how long to wait for SDK to attach in ms] */
 const PUTER_SDK_WAIT_MS = 5000;
+/* @tweakable [postMessage sign-in confirmation timeout in ms] */
+const PUTER_POSTMESSAGE_SIGNIN_TIMEOUT_MS = 30000;
+
+/* @tweakable [If true, UI treats a mere SDK init as connected; set false to require an authenticated user] */
+const PUTER_UI_ASSUME_CONNECTED_ON_INIT = false;
+
+/* @tweakable [When true, mirror sign-in events outward to parent frame to keep host UI in sync] */
+const PUTER_MIRROR_SIGNIN_TO_PARENT = true;
 
 const PuterShim = {
   ready: null,
@@ -89,6 +97,12 @@ const PuterShim = {
           window.Puter.auth.currentUser = this.user;
           // Emit a sign-in event so any listeners (App, managers) can react immediately
           try { window.dispatchEvent(new CustomEvent('puter:signin', { detail: this.user })); } catch(e) {}
+          // Mirror to parent frame to ensure host badge / options reflect sign-in when nested in Websim
+          try {
+            if (PUTER_MIRROR_SIGNIN_TO_PARENT && window.parent && window.parent !== window) {
+              window.parent.postMessage({ type: 'legacy:puter-session', user: { id: this.user.id, username: this.user.username, email: this.user.email } }, '*');
+            }
+          } catch (e) { console.warn('Failed to post puter:signin to parent', e); }
         } else {
           // NEW: try additional SDK variations for getting current user to handle different Puter.js versions
           try {
@@ -110,6 +124,40 @@ const PuterShim = {
 
       // Ensure UI is updated immediately if we found a user
       try { updateCloudStatusUI(); } catch(e) {}
+      
+      // Mirror sign-in messages received via postMessage (handles popup -> iframe -> parent flows).
+      window.addEventListener('message', (ev) => {
+        try {
+          if (!ev?.data) return;
+          if (ev.data.type === 'puter:signin' || ev.data.type === 'legacy:puter-session' || ev.data.type === 'puter:whoami') {
+            const who = ev.data.user || ev.data.who || ev.data.detail || null;
+            if (who) {
+              PuterShim.user = who;
+              window.Puter.auth = window.Puter.auth || {};
+              window.Puter.auth.currentUser = who;
+              try { window.dispatchEvent(new CustomEvent('puter:signin', { detail: who })); } catch(e){}
+              updateCloudStatusUI();
+            }
+          }
+        } catch(e) { /* ignore */ }
+      }, false);
+
+      // Accept host->shim sign-in messages (so parent can push session into iframe)
+      window.addEventListener('message', (ev) => {
+        try {
+          if (!ev?.data) return;
+          if (ev.data.type === 'host:puter-session' || ev.data.type === 'legacy:puter-session') {
+            const who = ev.data.user || ev.data.detail || null;
+            if (who) {
+              PuterShim.user = who;
+              window.Puter.auth = window.Puter.auth || {};
+              window.Puter.auth.currentUser = who;
+              try { window.dispatchEvent(new CustomEvent('puter:signin', { detail: who })); } catch(e) {}
+              updateCloudStatusUI();
+            }
+          }
+        } catch(e){}
+      }, false);
 
       // If SDK supports auth state hook, forward to update UI
       try {
@@ -117,6 +165,28 @@ const PuterShim = {
           window.Puter.auth.onAuthStateChanged((u) => {
             PuterShim.user = u || null;
             updateCloudStatusUI();
+           // ensure that signing-in incomplete shows red and explicit label
+           if (!u) {
+             const cloudEl = document.getElementById('cloudStorageStatus');
+             if (cloudEl) { cloudEl.textContent = 'Cloud Storage: Sign-in incomplete'; cloudEl.className = 'cloud-storage-status disconnected'; }
+             // also update options modal status if present
+             const optsEl = document.getElementById('puterAccountStatus');
+             if (optsEl) optsEl.textContent = 'Puter: sign-in incomplete';
+           }
+            // also refresh options UI elements if they exist
+            const statusEl = document.getElementById('puterAccountStatus');
+            const detailsEl = document.getElementById('puterAccountDetails');
+            if (statusEl && detailsEl) {
+              if (PuterShim.user) {
+                statusEl.textContent = `Puter: Connected — ${PuterShim.user.username || PuterShim.user.id || 'User'}`;
+                detailsEl.style.display = 'block';
+                detailsEl.textContent = `ID: ${PuterShim.user.id || 'N/A'}${PuterShim.user.email ? ` | Email: ${PuterShim.user.email}` : ''}`;
+              } else {
+                statusEl.textContent = 'Puter: Not connected';
+                detailsEl.style.display = 'none';
+                detailsEl.textContent = '';
+              }
+            }
           });
         }
       } catch (e) { /* ignore */ }
@@ -127,11 +197,18 @@ const PuterShim = {
       // If interactive sign-in fails or is blocked, show a styled sign-in prompt.
       (async () => {
         try {
-          // try to sign-in interactively (will prefer SDK signIn() if available)
-          const u = await this.ensureSignedInInteractive();
-          if (!u) {
-            // show styled prompt if sign-in wasn't completed
-            showSignInPrompt(true);
+          // Avoid forcing interactive sign-in when running inside Websim (prevents duplicate UX flows)
+          const runningInWebsim = typeof window.websim !== 'undefined';
+          if (!runningInWebsim) {
+            // try to sign-in interactively (will prefer SDK signIn() if available)
+            const u = await this.ensureSignedInInteractive();
+            if (!u) {
+              // show styled prompt if sign-in wasn't completed
+              showSignInPrompt(true);
+            }
+          } else {
+            // In Websim, prefer non-interactive detection only (no popup)
+            try { await this.init(); } catch(e){}
           }
         } catch (e) {
           console.warn('Automatic interactive sign-in failed:', e?.message || e);
@@ -211,12 +288,15 @@ function updateCloudStatusUI() {
   try {
     const el = document.getElementById('cloudStorageStatus');
     if (!el) return;
-    // If PuterShim can provide storage info, prefer that (ensures options modal and main badge align)
     if (window.PuterShim && typeof window.PuterShim.getStorageInfo === 'function') {
       window.PuterShim.getStorageInfo().then(info => {
+        const bottomEl = document.getElementById('puterBottomNotice'); // unified selector
         if (!info || !info.connected) {
           el.textContent = 'Cloud Storage: Local (Puter.AI not connected)';
           el.className = 'cloud-storage-status disconnected';
+          if (bottomEl) bottomEl.textContent = 'Puter: Not connected (click to sign in)', bottomEl.className = 'puter-bottom-notice disconnected';
+          // broadcast shared status
+          window.dispatchEvent(new CustomEvent('puter:status-updated', { detail: { text: 'Puter: Not connected (click to sign in)', state: 'disconnected', cloudText: el.textContent, accountText: 'Puter: Not connected' } }));
         } else {
           let userLabel = info.user?.username ? ` — ${info.user.username}` : '';
           let quotaText = '';
@@ -227,16 +307,23 @@ function updateCloudStatusUI() {
           }
           el.textContent = `Cloud Storage: Connected (Puter.AI${userLabel})${quotaText}`;
           el.className = 'cloud-storage-status connected';
+          if (bottomEl) bottomEl.textContent = `Puter: Connected — ${info.user?.username || 'user'}`, bottomEl.className = 'puter-bottom-notice connected';
+          window.dispatchEvent(new CustomEvent('puter:status-updated', { detail: { text: `Puter: Connected — ${info.user?.username || 'user'}`, state: 'connected', cloudText: el.textContent, accountText: `Puter: Connected — ${info.user?.username || 'user'}` } }));
         }
       }).catch(() => {
-        // fallback to simple check
         const user = PuterShim.user || (window.Puter && window.Puter.auth && window.Puter.auth.currentUser) || null;
         if (user) {
           el.textContent = `Cloud Storage: Connected (Puter.AI${user.username ? ` — ${user.username}` : ''})`;
           el.className = 'cloud-storage-status connected';
+          const bottomEl = document.getElementById('puterBottomNotice');
+          if (bottomEl) bottomEl.textContent = `Puter: Connected — ${user.username || user.id}`, bottomEl.className = 'puter-bottom-notice connected';
+          window.dispatchEvent(new CustomEvent('puter:status-updated', { detail: { text: `Puter: Connected — ${user.username || user.id}`, state: 'connected', cloudText: el.textContent, accountText: `Puter: Connected — ${user.username || user.id}` } }));
         } else {
           el.textContent = 'Cloud Storage: Local (Puter.AI not connected)';
           el.className = 'cloud-storage-status disconnected';
+          const bottomEl = document.getElementById('puterBottomNotice');
+          if (bottomEl) bottomEl.textContent = 'Puter: Not connected (click to sign in)', bottomEl.className = 'puter-bottom-notice disconnected';
+          window.dispatchEvent(new CustomEvent('puter:status-updated', { detail: { text: 'Puter: Not connected (click to sign in)', state: 'disconnected', cloudText: el.textContent, accountText: 'Puter: Not connected' } }));
         }
       });
       return;
@@ -271,7 +358,8 @@ function showSignInPrompt(autoOpen = false) {
     d.style.background = 'var(--color-bg-light)';
     d.style.color = 'var(--color-text-dark)';
     d.style.padding = '10px';
-    d.style.border = '1px solid var(--color-border)';
+    // make the border red when sign-in incomplete to match requested UX
+    d.style.border = '1px solid #d33';
     d.style.boxShadow = 'var(--shadow-md)';
     d.innerHTML = `<div style="font-weight:600;margin-bottom:6px">Sign in to Puter</div><div style="font-size:13px;margin-bottom:8px;color:var(--color-text-medium)">Connect your account to enable cloud storage, KV and AI services.</div><div style="display:flex;gap:8px"><button id="${id}-btn" class="btn btn-primary">Sign in with Puter</button><button id="${id}-close" class="btn btn-secondary btn-sm">Close</button></div>`;
     document.body.appendChild(d);
@@ -280,7 +368,8 @@ function showSignInPrompt(autoOpen = false) {
         await PuterShim.ensureSignedInInteractive();
         document.getElementById(id)?.remove();
       } catch (e) {
-        alert('Sign-in failed: ' + (e?.message || e));
+        // more explicit user guidance when sign-in fails inside iframe (websim)
+        alert('Sign-in failed: ' + (e?.message || e) + '\nIf you are inside Websim, allow popups and complete sign-in in the opened window. If continued failure occurs, run the Puter Diagnostic widget.');
       }
     });
     document.getElementById(`${id}-close`).addEventListener('click', () => d.remove());
@@ -674,14 +763,36 @@ function formatBytes(bytes) {
 
       // Options modal sign-in/sign-out/storage wiring (use existing PuterShim helpers)
       if (optSignInBtn) {
+        /* @tweakable [text shown in options modal while interactive sign-in is in progress] */
+        const OPT_SIGNIN_IN_PROGRESS_TEXT = 'Puter: Signing in…';
+        /* @tweakable [text shown in options modal when interactive sign-in fails or is incomplete] */
+        const OPT_SIGNIN_INCOMPLETE_TEXT = 'Puter: sign-in incomplete';
+
         optSignInBtn.addEventListener('click', async () => {
           try {
+            // immediate UI feedback for user gesture (required for popup)
+            if (optStatusEl) optStatusEl.textContent = OPT_SIGNIN_IN_PROGRESS_TEXT;
+            // ensure global badge also reflects the attempt
+            const cloudEl = document.getElementById('cloudStorageStatus');
+            if (cloudEl) { cloudEl.textContent = 'Cloud Storage: Signing in…'; cloudEl.className = 'cloud-storage-status disconnected'; }
+
             const u = await PuterShim.ensureSignedInInteractive();
             PuterShim.user = u || PuterShim.user;
             updateCloudStatusUI();
-            if (optStatusEl) optStatusEl.textContent = `Puter: ${u ? 'Connected — ' + (u.username || u.id) : 'Not connected'}`;
-            if (optDetailsEl && u) optDetailsEl.style.display = 'block', optDetailsEl.textContent = `ID: ${u.id || 'N/A'}${u.email ? ` | Email: ${u.email}` : ''}`;
-          } catch (e) { console.warn('Options sign-in failed:', e); }
+            if (u) {
+              if (optStatusEl) optStatusEl.textContent = `Puter: Connected — ${u.username || u.id}`;
+              if (optDetailsEl && u) { optDetailsEl.style.display = 'block'; optDetailsEl.textContent = `ID: ${u.id || 'N/A'}${u.email ? ` | Email: ${u.email}` : ''}`; }
+            } else {
+              // sign-in did not complete (user cancelled or popup blocked)
+              if (optStatusEl) optStatusEl.textContent = OPT_SIGNIN_INCOMPLETE_TEXT;
+              if (cloudEl) { cloudEl.textContent = 'Cloud Storage: Sign-in incomplete'; cloudEl.className = 'cloud-storage-status disconnected'; }
+            }
+          } catch (e) {
+            console.warn('Options sign-in failed:', e);
+            if (optStatusEl) optStatusEl.textContent = OPT_SIGNIN_INCOMPLETE_TEXT;
+            const cloudEl = document.getElementById('cloudStorageStatus');
+            if (cloudEl) { cloudEl.textContent = 'Cloud Storage: Sign-in failed'; cloudEl.className = 'cloud-storage-status disconnected'; }
+          }
         });
       }
       if (optSignOutBtn) {
@@ -712,25 +823,61 @@ function formatBytes(bytes) {
         window.Puter.auth.onAuthStateChanged((u) => {
           PuterShim.user = u || null;
           updateCloudStatusUI();
-          // also refresh options UI elements if they exist
-          const statusEl = document.getElementById('puterAccountStatus');
-          const detailsEl = document.getElementById('puterAccountDetails');
-          if (statusEl && detailsEl) {
-            if (PuterShim.user) {
-              statusEl.textContent = `Puter: Connected — ${PuterShim.user.username || PuterShim.user.id || 'User'}`;
-              detailsEl.style.display = 'block';
-              detailsEl.textContent = `ID: ${PuterShim.user.id || 'N/A'}${PuterShim.user.email ? ` | Email: ${PuterShim.user.email}` : ''}`;
-            } else {
-              statusEl.textContent = 'Puter: Not connected';
-              detailsEl.style.display = 'none';
-              detailsEl.textContent = '';
+           // ensure that signing-in incomplete shows red and explicit label
+           if (!u) {
+             const cloudEl = document.getElementById('cloudStorageStatus');
+             if (cloudEl) { cloudEl.textContent = 'Cloud Storage: Sign-in incomplete'; cloudEl.className = 'cloud-storage-status disconnected'; }
+             // also update options modal status if present
+             const optsEl = document.getElementById('puterAccountStatus');
+             if (optsEl) optsEl.textContent = 'Puter: sign-in incomplete';
+           }
+            // also refresh options UI elements if they exist
+            const statusEl = document.getElementById('puterAccountStatus');
+            const detailsEl = document.getElementById('puterAccountDetails');
+            if (statusEl && detailsEl) {
+              if (PuterShim.user) {
+                statusEl.textContent = `Puter: Connected — ${PuterShim.user.username || PuterShim.user.id || 'User'}`;
+                detailsEl.style.display = 'block';
+                detailsEl.textContent = `ID: ${PuterShim.user.id || 'N/A'}${PuterShim.user.email ? ` | Email: ${PuterShim.user.email}` : ''}`;
+              } else {
+                statusEl.textContent = 'Puter: Not connected';
+                detailsEl.style.display = 'none';
+                detailsEl.textContent = '';
+              }
             }
-          }
           // update project badge on auth changes
           try { checkAndSetProjectBadge(); } catch(e) {}
         });
       }
     } catch (e) { /* ignore */ }
+
+    // NEW: keep bottom Puter notice behind open modals/panels by observing DOM visibility
+    (function keepBottomNoticeBehindModals() {
+      try {
+        const NOTICE_ID = 'puterBottomNotice';
+        const noticeEl = () => document.getElementById(NOTICE_ID);
+        const setZ = (z) => { const el = noticeEl(); if (el) el.style.zIndex = z; };
+
+        const checkAndAdjust = () => {
+          // If any modal or preview is visible, lower the notice z-index so it sits behind (but above content)
+          const modalVisible = !!document.querySelector('.modal-content, .options-modal, .preview-modal, .github-modal, .custom-modal, .preview-content:not([style*=\"display: none\"])');
+          if (modalVisible) setZ(600); else setZ(700);
+        };
+
+        // run once
+        checkAndAdjust();
+
+        // observe changes to body subtree to react when modals open/close
+        const mo = new MutationObserver(() => {
+          checkAndAdjust();
+        });
+        mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+
+        // also listen for custom modal open/close events if app emits them
+        window.addEventListener('modal:open', checkAndAdjust);
+        window.addEventListener('modal:close', checkAndAdjust);
+      } catch (e) { /* non-critical */ }
+    })();
 
   } catch (e) {
     console.warn('PuterShim auto-init failed:', e?.message || e);
