@@ -8,8 +8,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <!-- Puter.js SDK (required by Puter integration) -->
     <script src="https://js.puter.com/v2/"></script>
+    <!-- Puter integration shim (provides window.PuterShim + unified helpers) -->
+    <script src="puter_integration.js"></script>
     <!-- Puter quick initializer: auto-check sign-in, show click-to-sign-in banner, expose testing helpers -->
     <script type="module" src="puter-init.js"></script>
+    <!-- AI Status Manager: monitors and displays connection status for all AI models -->
+    <script src="ai-status-manager.js"></script>
+    <!-- AI Model selector logic (groups, auto sign-in for Puter on select) -->
+    <script src="puter_ai_selector.js"></script>
 
     <!-- Monaco loader (AMD) for the in-browser Monaco Editor -->
     <script src="https://unpkg.com/monaco-editor@0.39.0/min/vs/loader.js"></script>
@@ -35,21 +41,28 @@
         <header class="header">
             <div class="header-content">
                 <h1 class="logo">VisionStack</h1>
-                <!-- AI model selector (moved into header) -->
-                <div id="ai-model-selector" style="position:relative;display:flex;align-items:center;gap:8px;font-family:Inter,system-ui;">
-                  <span style="font-size:13px;color:var(--color-text-dark);font-weight:600;">AI</span>
-                  <button id="ai-model-badge" class="btn btn-secondary btn-sm" aria-haspopup="listbox" aria-expanded="false" style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;min-width:220px;justify-content:space-between;">
-                    <span id="ai-model-badge-label" style="font-weight:600;display:inline-flex;align-items:center;gap:8px;">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
-                      Select model…
-                    </span>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                  </button>
-
-  <!-- dropdown menu (initially hidden) - solid background, high z-index, proper contrast -->
-  <div id="ai-model-menu" role="listbox" aria-label="AI model list" style="display:none;position:absolute;top:46px;left:0;min-width:280px;background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10000;padding:8px;">
-    <!-- populated by script -->
-  </div>
+                <!-- AI model selector (styled like AI Thoughts dropdown) -->
+                <div id="ai-model-selector" style="display:flex;align-items:center;gap:8px;">
+                  <label for="aiModelSelect" style="font-size:13px;color:var(--color-text-dark);font-weight:600;">AI Model</label>
+                  <select id="aiModelSelect" class="form-select" aria-label="AI model" style="min-width:280px;">
+                    <optgroup label="Google Gemini (FREE - Limited Time)">
+                      <option value="lovable:gemini-flash" selected>Gemini 2.5 Flash - FREE - Fast & balanced</option>
+                      <option value="lovable:gemini-pro">Gemini 2.5 Pro - FREE - Most capable</option>
+                      <option value="lovable:gemini-lite">Gemini 2.5 Lite - FREE - Ultra-fast</option>
+                    </optgroup>
+                    <optgroup label="WebSim AI (WebSim.com only)">
+                      <option value="websim:gpt5-nano">WebSim AI - Only works in WebSim.com</option>
+                    </optgroup>
+                    <optgroup label="Puter.AI (Free with Puter Account)">
+                      <option value="puter:gpt-5">GPT-5 - OpenAI via Puter</option>
+                      <option value="puter:claude-sonnet">Claude Sonnet 4 - Anthropic via Puter</option>
+                      <option value="puter:deepseek-r1">DeepSeek R1 - Advanced reasoning via Puter</option>
+                      <option value="puter:llama-3.3">Llama 3.3 70B - Meta via Puter</option>
+                    </optgroup>
+                  </select>
+                  <div id="aiModelStatus" style="font-size:11px;color:var(--color-text-medium);margin-left:8px;">
+                    <span id="aiStatusIndicator">●</span> <span id="aiStatusText">Ready</span>
+                  </div>
                 </div>
                 <div class="header-actions">
                     <button class="theme-toggle" id="themeToggle">
@@ -229,8 +242,19 @@
 
                     <div class="panel-content" id="devLogPanelContent">
                         <div class="devlog-section">
-                            <h4>DevSpark AI Internal Scripts</h4>
-                            <p style="color: var(--color-text-medium); margin-bottom: var(--spacing-lg);">
+                            <div class="code-header" style="border-bottom:1px solid var(--color-border);align-items:center;">
+                                <div class="file-info" style="display:flex;align-items:center;gap:12px;">
+                                    <h4 style="margin:0;">DevSpark AI Internal Scripts</h4>
+                                    <span style="color:var(--color-text-medium);font-size:13px;">(internal)</span>
+                                </div>
+                                <div class="code-actions" style="margin-left:auto;">
+                                    <!-- single refresh button for internal scripts -->
+                                    <button id="refreshInternalScriptsBtn" class="btn btn-secondary btn-sm" title="Refresh list">Refresh</button>
+                                    <button id="copyForAIBtn" class="btn btn-secondary btn-sm" title="Copy selected script for AI">Copy for AI</button>
+                                    <button id="summarizeAIBtn" class="btn btn-primary btn-sm" title="Summarize (AI)">Summarize (AI)</button>
+                                </div>
+                            </div>
+                            <p style="color: var(--color-text-medium); margin:var(--spacing-md) 0 var(--spacing-lg) 0;">
                                 Below are the internal scripts and source code that power DevSpark AI. This is provided for transparency and debugging purposes.
                             </p>
                             <div id="devLogContent">
@@ -495,6 +519,7 @@
     <script type="module" src="chatManager.js"></script>
     <!-- Puter integration must be available before app initializes -->
     <script type="module" src="puter_integration.js"></script>
+    <script type="module" src="puter_api.js"></script>
     <script type="module" src="puter_services.js"></script>
     <script type="module" src="puter_dictation.js"></script>
     <script type="module" src="app.js"></script>
