@@ -109,33 +109,23 @@ class PuterSignIn {
         signInBtn.disabled = true;
       }
 
-      console.log('🔐 Sign-in button clicked, calling Puter SDK...');
-
-      // Use Puter SDK directly
-      if (window.Puter?.auth?.signIn) {
-        const user = await window.Puter.auth.signIn();
-        console.log('✅ Sign-in successful:', user);
-        
-        // Update global state
-        window.Puter.auth.currentUser = user;
-        if (window.PuterShim) {
-          window.PuterShim.user = user;
-        }
-        
-        // Dispatch event
-        window.dispatchEvent(new CustomEvent('puter:signin', { detail: user }));
-        
-        this.hide();
-        
-        // Notify the app
-        if (window.app?.initPuterStorage) {
-          window.app.initPuterStorage();
-        }
+      // Use the global Puter integration
+      if (window.lovablePuter && window.lovablePuter.signIn) {
+        await window.lovablePuter.signIn();
+      } else if (window.Puter && window.Puter.auth && window.Puter.auth.signIn) {
+        await window.Puter.auth.signIn();
       } else {
-        throw new Error('Puter SDK not available. Please refresh the page.');
+        throw new Error('Puter sign-in not available');
+      }
+
+      this.hide();
+      
+      // Notify the app
+      if (window.app && window.app.initPuterStorage) {
+        window.app.initPuterStorage();
       }
     } catch (error) {
-      console.error('❌ Puter sign-in failed:', error);
+      console.error('Puter sign-in failed:', error);
       
       const signInBtn = document.getElementById('puter-signin-btn');
       if (signInBtn) {
@@ -154,7 +144,7 @@ class PuterSignIn {
         color: #dc2626; 
         font-size: 12px;
       `;
-      errorDiv.textContent = error.message || 'Sign-in failed. Please try again.';
+      errorDiv.textContent = 'Sign-in failed. Please try again.';
       this.popup.appendChild(errorDiv);
       
       setTimeout(() => {

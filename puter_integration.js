@@ -223,30 +223,63 @@ const PuterShim = {
     await this.init();
     if (this.user) return this.user;
 
-    console.log('🔐 Starting Puter sign-in...');
-
-    // Use the Puter SDK's built-in sign-in
-    if (window.Puter?.auth?.signIn) {
+    // Prefer SDK signIn if available, otherwise open auth URL and poll for session
+    if (window.Puter && window.Puter.auth && typeof window.Puter.auth.signIn === 'function') {
       try {
-        console.log('🔐 Calling Puter.auth.signIn()...');
-        const user = await window.Puter.auth.signIn();
-        console.log('✅ Puter sign-in successful:', user);
-        
-        this.user = user;
-        window.Puter.auth.currentUser = user;
-        
-        // Dispatch sign-in event
-        window.dispatchEvent(new CustomEvent('puter:signin', { detail: user }));
+        const u = await window.Puter.auth.signIn();
+        this.user = u;
         updateCloudStatusUI();
-        
-        return user;
-      } catch (error) {
-        console.error('❌ Puter sign-in failed:', error);
-        throw new Error(`Puter sign-in failed: ${error.message}`);
+        return u;
+      } catch (e) {
+        console.warn('Puter.auth.signIn failed or cancelled:', e?.message || e);
+        // fallback to popup below
       }
     }
 
-    throw new Error('Puter SDK not available or not properly initialized');
+    // Fallback: open auth popup and poll for session
+    const authUrl = 'https://puter.com/action/sign-in?embedded_in_popup=true&request_auth=true';
+    const popup = tryOpenPopup(authUrl, { width: 900, height: 720 });
+    if (!popup) {
+      // Popup blocked — show user clickable link and return
+      showSignInPrompt(false);
+      return null;
+    }
+
+    // Poll for user becoming available via Puter.identity.whoami or auth.currentUser
+    const start = Date.now();
+    const timeout = 60_000; // 60s
+    while (Date.now() - start < timeout) {
+      try {
+        if (window.Puter && window.Puter.identity && typeof window.Puter.identity.whoami === 'function') {
+          const u = await window.Puter.identity.whoami().catch(() => null);
+          if (u) {
+            this.user = u;
+            // Mirror into global SDK auth surface and notify app listeners
+            window.Puter.auth = window.Puter.auth || {};
+            window.Puter.auth.currentUser = this.user;
+            window.dispatchEvent(new CustomEvent('puter:signin', { detail: this.user }));
+            updateCloudStatusUI();
+            try { popup.close(); } catch {}
+            return u;
+          }
+        }
+        if (window.Puter && window.Puter.auth && window.Puter.auth.currentUser) {
+          const u = window.Puter.auth.currentUser;
+          if (u) {
+            this.user = u;
+            window.dispatchEvent(new CustomEvent('puter:signin', { detail: this.user }));
+            updateCloudStatusUI();
+            try { popup.close(); } catch {}
+            return u;
+          }
+        }
+      } catch (e) { /* ignore transient cross-origin errors */ }
+      if (popup.closed) break;
+      await new Promise(r => setTimeout(r, 800));
+    }
+    try { if (!popup.closed) popup.close(); } catch {}
+    console.warn('Interactive sign-in timed out or was cancelled.');
+    return null;
   }
 };
 
