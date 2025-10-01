@@ -680,9 +680,9 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
 
         // Map model IDs to providers and API models
         const modelMap = {
-            'lovable:gemini-flash': { provider: 'lovable', model: 'google/gemini-2.5-flash' },
-            'lovable:gemini-pro': { provider: 'lovable', model: 'google/gemini-2.5-pro' },
-            'lovable:gemini-lite': { provider: 'lovable', model: 'google/gemini-2.5-flash-lite' },
+            'lovable:gemini-flash': { provider: 'gemini', model: 'google/gemini-2.5-flash' },
+            'lovable:gemini-pro': { provider: 'gemini', model: 'google/gemini-2.5-pro' },
+            'lovable:gemini-lite': { provider: 'gemini', model: 'google/gemini-2.5-flash-lite' },
             'websim:gpt5-nano': { provider: 'websim', model: null },
             'puter:gpt-5': { provider: 'puter', model: 'gpt-5' },
             'puter:claude-sonnet': { provider: 'puter', model: 'claude-sonnet-4-20250514' },
@@ -690,12 +690,14 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
             'puter:llama-3.3': { provider: 'puter', model: 'llama-3.3-70b' }
         };
 
-        const modelInfo = modelMap[selectedModel] || { provider: 'lovable', model: 'google/gemini-2.5-flash' };
+        const modelInfo = modelMap[selectedModel] || { provider: 'gemini', model: 'google/gemini-2.5-flash' };
+        
+        console.log(`🤖 Selected model: ${selectedModel}, Provider: ${modelInfo.provider}, API Model: ${modelInfo.model}`);
 
         // Define provider call functions
-        const callLovableAI = async () => {
+        const callGemini = async () => {
             const FUNCTIONS_URL = 'https://dtwyytscuoyrbhajkbyk.functions.supabase.co/lovable-ai-chat';
-            console.log('🔵 Calling Lovable AI with model:', modelInfo.model);
+            console.log('🟢 Calling Google Gemini via Lovable Gateway with model:', modelInfo.model);
             
             const response = await fetch(FUNCTIONS_URL, {
                 method: 'POST',
@@ -706,28 +708,41 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
                 })
             });
 
-            console.log('🔵 Lovable AI response status:', response.status);
+            console.log('🟢 Gemini response status:', response.status);
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('❌ Lovable AI error response:', errorText);
-                throw new Error(`Lovable AI error: ${response.status} - ${errorText}`);
+                console.error('❌ Gemini error response:', errorText);
+                throw new Error(`Google Gemini error: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
-            console.log('✅ Lovable AI response received:', data);
+            console.log('✅ Gemini response received');
             return data.choices?.[0]?.message?.content || data.content || '';
         };
 
         const callWebsim = async () => {
-            if (runningInWebsim && window.websim?.chat?.completions?.create) {
-                return await websim.chat.completions.create(payload);
+            console.log('🔴 Checking WebSim availability...');
+            if (!runningInWebsim) {
+                throw new Error('WebSim AI only works when running inside WebSim.com environment. Please select a different AI model.');
             }
-            throw new Error('Websim not available');
+            if (window.websim?.chat?.completions?.create) {
+                console.log('🔴 Calling WebSim AI...');
+                const result = await websim.chat.completions.create(payload);
+                console.log('✅ WebSim response received');
+                return result;
+            }
+            throw new Error('WebSim SDK not available in this environment');
         };
 
         const callPuter = async () => {
             console.log('🟣 Calling Puter AI with model:', modelInfo.model);
+            
+            // Check if user is signed in
+            const signedIn = !!(window.Puter?.auth?.currentUser || window.PuterShim?.user);
+            if (!signedIn) {
+                throw new Error('Puter AI requires sign-in. Please sign in to your Puter account to use Puter AI models.');
+            }
             
             // Build Puter-compatible payload
             const puterPayload = {
@@ -736,62 +751,70 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
                 stream: false
             };
 
-            // Try various Puter AI interfaces
+            console.log('🟣 Puter payload:', JSON.stringify(puterPayload, null, 2));
+
+            // Try various Puter AI interfaces in priority order
             let result;
+            let usedInterface = null;
+            
             if (window.Puter?.ai?.chat) {
+                console.log('🟣 Using window.Puter.ai.chat()');
+                usedInterface = 'Puter.ai.chat';
                 result = await window.Puter.ai.chat(puterPayload);
             } else if (window.PuterAPI?.ai?.chat) {
+                console.log('🟣 Using window.PuterAPI.ai.chat()');
+                usedInterface = 'PuterAPI.ai.chat';
                 result = await window.PuterAPI.ai.chat(puterPayload);
             } else if (window.PuterService?.ai?.chat) {
+                console.log('🟣 Using window.PuterService.ai.chat()');
+                usedInterface = 'PuterService.ai.chat';
                 result = await window.PuterService.ai.chat(puterPayload);
             } else {
-                throw new Error('Puter AI not available - please sign in to Puter.AI');
+                console.error('❌ No Puter AI interface available');
+                throw new Error('Puter AI SDK not available. Please ensure Puter SDK is loaded and you are signed in.');
             }
 
-            console.log('✅ Puter AI response:', result);
+            console.log(`✅ Puter AI response received via ${usedInterface}:`, result);
             
             // Extract content from Puter response format
             if (typeof result === 'string') return result;
             if (result?.choices?.[0]?.message?.content) return result.choices[0].message.content;
             if (result?.content) return result.content;
             if (result?.message) return result.message;
+            if (result?.text) return result.text;
             
-            throw new Error('Invalid Puter AI response format');
+            console.error('❌ Unexpected Puter response format:', result);
+            throw new Error('Unexpected Puter AI response format. Please try again or select a different model.');
         };
 
-        // Auto-fallback rotation: try selected provider first, then rotate through others
+        // Provider routing - NO AUTO-FALLBACK (user selected specific model)
         const providers = [
-            { name: 'lovable', fn: callLovableAI },
+            { name: 'gemini', fn: callGemini },
             { name: 'websim', fn: callWebsim },
             { name: 'puter', fn: callPuter }
         ];
 
-        // Prioritize the selected provider, then try others
+        // Call ONLY the selected provider (no auto-fallback)
         const selectedProvider = providers.find(p => p.name === modelInfo.provider);
-        const otherProviders = providers.filter(p => p.name !== modelInfo.provider);
-        const orderedProviders = selectedProvider ? [selectedProvider, ...otherProviders] : providers;
-
-        let lastError;
-        for (const provider of orderedProviders) {
-            try {
-                console.log(`Trying AI provider: ${provider.name}`);
-                const result = await Promise.race([
-                    provider.fn(),
-                    new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error(`${provider.name} timeout`)), FALLBACK_TIMEOUT_MS)
-                    )
-                ]);
-                console.log(`✓ ${provider.name} responded successfully`);
-                return result;
-            } catch (error) {
-                console.warn(`✗ ${provider.name} failed:`, error.message);
-                lastError = error;
-                // Continue to next provider
-            }
+        
+        if (!selectedProvider) {
+            throw new Error(`Unknown AI provider: ${modelInfo.provider}`);
         }
 
-        // All providers failed
-        throw new Error(`All AI providers failed. Last error: ${lastError?.message || 'Unknown error'}`);
+        try {
+            console.log(`🤖 Using AI provider: ${selectedProvider.name}`);
+            const result = await Promise.race([
+                selectedProvider.fn(),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error(`${selectedProvider.name} request timed out after ${FALLBACK_TIMEOUT_MS}ms`)), FALLBACK_TIMEOUT_MS)
+                )
+            ]);
+            console.log(`✅ ${selectedProvider.name} responded successfully`);
+            return result;
+        } catch (error) {
+            console.error(`❌ ${selectedProvider.name} failed:`, error);
+            throw new Error(`${selectedProvider.name} error: ${error.message}`);
+        }
     }
 
     async handleCreateProjectCommand(userMessage) {
