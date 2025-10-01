@@ -693,27 +693,28 @@ if (typeof parsedResponse.files !== 'object' || parsedResponse.files === null) {
 
         // Define provider call functions
         const callLovableAI = async () => {
-            const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL;
-            if (!supabaseUrl) throw new Error('Lovable AI not configured');
+            const FUNCTIONS_URL = 'https://dtwyytscuoyrbhajkbyk.functions.supabase.co/lovable-ai-chat';
+            console.log('🔵 Calling Lovable AI with model:', modelInfo.model);
             
-            const response = await fetch(`${supabaseUrl}/functions/v1/lovable-ai-chat`, {
+            const response = await fetch(FUNCTIONS_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY}`
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     messages: payload.messages,
                     model: modelInfo.model
                 })
             });
 
+            console.log('🔵 Lovable AI response status:', response.status);
+
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `Lovable AI error: ${response.status}`);
+                const errorText = await response.text();
+                console.error('❌ Lovable AI error response:', errorText);
+                throw new Error(`Lovable AI error: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
+            console.log('✅ Lovable AI response received:', data);
             return data.choices?.[0]?.message?.content || data.content || '';
         };
 
