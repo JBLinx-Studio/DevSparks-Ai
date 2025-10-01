@@ -10,11 +10,17 @@ serve(async (req) => {
 
   try {
     const { messages, model } = await req.json();
+    console.log('📥 Received request with model:', model, 'messages:', messages?.length);
+    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    if (!LOVABLE_API_KEY) {
+      console.error('❌ LOVABLE_API_KEY not configured');
+      throw new Error("LOVABLE_API_KEY is not configured");
+    }
 
     // Default to free Gemini Flash model
     const selectedModel = model || "google/gemini-2.5-flash";
+    console.log('🤖 Using model:', selectedModel);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -25,15 +31,17 @@ serve(async (req) => {
       body: JSON.stringify({
         model: selectedModel,
         messages: [
-          { 
-            role: "system", 
-            content: "You are a helpful AI assistant for VisionStack IDE. Provide concise, practical coding help." 
+          {
+            role: "system",
+            content: "You are VisionStack’s professional assistant. Respond in plain, human-readable text only. Do not include JSON, code blocks, or 'AI Thoughts' unless the user explicitly asks for code. Keep answers concise, actionable, and free of inner reasoning or meta commentary."
           },
           ...messages,
         ],
         stream: false,
       }),
     });
+
+    console.log('📡 Gateway response status:', response.status);
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -57,6 +65,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+    console.log('✅ Success! Returning response');
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

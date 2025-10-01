@@ -35,21 +35,27 @@
         <header class="header">
             <div class="header-content">
                 <h1 class="logo">VisionStack</h1>
-                <!-- AI model selector (moved into header) -->
-                <div id="ai-model-selector" style="position:relative;display:flex;align-items:center;gap:8px;font-family:Inter,system-ui;">
-                  <span style="font-size:13px;color:var(--color-text-dark);font-weight:600;">AI</span>
-                  <button id="ai-model-badge" class="btn btn-secondary btn-sm" aria-haspopup="listbox" aria-expanded="false" style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;min-width:220px;justify-content:space-between;">
-                    <span id="ai-model-badge-label" style="font-weight:600;display:inline-flex;align-items:center;gap:8px;">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
-                      Select model…
-                    </span>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                  </button>
-
-  <!-- dropdown menu (initially hidden) - solid background, high z-index, proper contrast -->
-  <div id="ai-model-menu" role="listbox" aria-label="AI model list" style="display:none;position:absolute;top:46px;left:0;min-width:280px;background:var(--color-bg-primary);border:1px solid var(--color-border);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10000;padding:8px;">
-    <!-- populated by script -->
-  </div>
+                <!-- AI model selector (styled like AI Thoughts dropdown) -->
+                <div id="ai-model-selector" style="display:flex;align-items:center;gap:8px;">
+                  <label for="aiModelSelect" style="font-size:13px;color:var(--color-text-dark);font-weight:600;">AI Model</label>
+                  <select id="aiModelSelect" class="form-select" aria-label="AI model" style="min-width:220px;">
+                    <optgroup label="Lovable AI (FREE Gemini - Limited Time)">
+                      <option value="lovable:gemini-flash" selected>Gemini 2.5 Flash - FREE - Fast & balanced (default)</option>
+                      <option value="lovable:gemini-pro">Gemini 2.5 Pro - FREE - Most capable, complex reasoning</option>
+                      <option value="lovable:gemini-lite">Gemini 2.5 Lite - FREE - Ultra-fast, simple tasks</option>
+                    </optgroup>
+                    <optgroup label="WebSim AI">
+                      <option value="websim:gpt5-nano">WebSim AI - Default WebSim assistant</option>
+                    </optgroup>
+                    <optgroup label="Puter.AI (Free & Unlimited with Account)">
+                      <option value="puter:gpt-5">GPT-5 - Powered by OpenAI, free via Puter</option>
+                      <option value="puter:claude-sonnet">Claude Sonnet 4 - Anthropic's latest, free via Puter</option>
+                      <option value="puter:deepseek-r1">DeepSeek R1 - Advanced reasoning model, free via Puter</option>
+                      <option value="puter:llama-3.3">Llama 3.3 70B - Meta's open model, free via Puter</option>
+                    </optgroup>
+                      <option value="puter:deepseek">DeepSeek - Free unlimited via Puter</option>
+                    </optgroup>
+                  </select>
                 </div>
                 <div class="header-actions">
                     <button class="theme-toggle" id="themeToggle">
@@ -506,6 +512,7 @@
     <script type="module" src="chatManager.js"></script>
     <!-- Puter integration must be available before app initializes -->
     <script type="module" src="puter_integration.js"></script>
+    <script type="module" src="puter_api.js"></script>
     <script type="module" src="puter_services.js"></script>
     <script type="module" src="puter_dictation.js"></script>
     <script type="module" src="app.js"></script>
