@@ -41,7 +41,15 @@ const MODEL_SPEECH_MAP = {
 
 function createSelector() {
   const select = document.getElementById('aiModelSelect');
-  if (!select) return;
+  if (!select) {
+    console.error('❌ AI Model select element not found!');
+    return;
+  }
+  
+  console.log('✓ Initializing AI Model selector...');
+
+  // Clear any existing options
+  select.innerHTML = '';
 
   // Populate select with grouped options
   const groups = { lovable: [], websim: [], puter: [] };
@@ -49,10 +57,15 @@ function createSelector() {
     const category = m.category || 'websim';
     if (groups[category]) groups[category].push(m);
   });
+  
+  console.log('✓ Grouped models:', { lovable: groups.lovable.length, websim: groups.websim.length, puter: groups.puter.length });
 
   // Create optgroups matching the AI Thoughts style
   const createOptGroup = (label, items) => {
-    if (!items || items.length === 0) return;
+    if (!items || items.length === 0) {
+      console.warn(`⚠️ No items for group: ${label}`);
+      return;
+    }
     const optgroup = document.createElement('optgroup');
     optgroup.label = label;
     items.forEach(m => {
@@ -63,12 +76,15 @@ function createSelector() {
       optgroup.appendChild(option);
     });
     select.appendChild(optgroup);
+    console.log(`✓ Added ${items.length} models to group: ${label}`);
   };
 
   // Order: Lovable AI FREE first
   createOptGroup(AI_SELECTOR_GROUP_LABELS.lovable, groups.lovable);
   createOptGroup(AI_SELECTOR_GROUP_LABELS.websim, groups.websim);
   createOptGroup(AI_SELECTOR_GROUP_LABELS.puter, groups.puter);
+  
+  console.log(`✓ AI Model selector populated with ${select.options.length} total options`);
 
   // Load preferred model
   async function loadPreferred() {
